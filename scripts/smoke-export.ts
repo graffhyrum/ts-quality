@@ -6,9 +6,10 @@ import path from "node:path";
 import { mustRun, run } from "./lib/run.ts";
 
 type Manifest = {
+  readonly kind: string;
   readonly entries: readonly {
     readonly name: string;
-    readonly tarball: string;
+    readonly assets: readonly { readonly name: string }[];
   }[];
 };
 
@@ -31,7 +32,10 @@ async function smoke(work: string): Promise<void> {
   const server = serveDir(artifacts);
   try {
     const specs = Object.fromEntries(
-      manifest.entries.map((e) => [e.name, `${server.url}${e.tarball}`]),
+      manifest.entries.map((e) => [
+        e.name,
+        `${server.url}${e.assets[0]?.name}`,
+      ]),
     );
     const specsPath = path.join(work, "specs.json");
     await Bun.write(specsPath, `${JSON.stringify(specs, null, 2)}\n`);

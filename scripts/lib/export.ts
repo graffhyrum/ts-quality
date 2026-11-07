@@ -74,3 +74,11 @@ export function hookSetupProblems(pkg: Manifest): string[] {
       .map((dep) => `hook manager dependency ${dep}`),
   ];
 }
+
+/** Paths with uncommitted changes under the template, from `git status --porcelain -z`. */
+export function dirtyPaths(porcelainZ: string): string[] {
+  return porcelainZ
+    .split("\0")
+    .filter((entry) => entry.length > 3)
+    .map((entry) => entry.slice(3));
+}

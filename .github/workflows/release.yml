@@ -1,6 +1,7 @@
-# Manual release: re-runs every gate, packs, and creates DRAFT releases for versions that
-# have no release yet. A maintainer reviews and publishes each draft; nothing is public
-# or tagged until then. No registry publication happens here.
+# Manual release from main only. Re-runs every gate on a clean checkout of the dispatched main
+# commit, checks release readiness fail-closed (no pending changesets, no reused versions or tags),
+# and creates DRAFT releases. A maintainer reviews and publishes each draft; nothing is public or
+# tagged until then. No registry publication happens here.
 name: Draft releases
 
 on:
@@ -9,11 +10,21 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: draft-releases
+  cancel-in-progress: false
+
 jobs:
   draft:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          fetch-tags: true
+          clean: true
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.4.4"
@@ -23,7 +34,8 @@ jobs:
       - run: bun run vet
       - run: bun run test:plain
       - run: bun run smoke:export "$RUNNER_TEMP/smoke"
-      - run: bun run release:plan "$RUNNER_TEMP/plan" --repo "$GITHUB_REPOSITORY"
-      - run: bun scripts/draft-releases.ts "$RUNNER_TEMP/plan" "$GITHUB_SHA"
+      - name: Release readiness and plan (fails on pending changesets or reused versions)
+        run: bun run release:plan "$RUNNER_TEMP/plan" --release --repo "$GITHUB_REPOSITORY"
+      - run: bun scripts/draft-releases.ts "$RUNNER_TEMP/plan"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

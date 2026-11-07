@@ -35,9 +35,6 @@
 		"custom-hooks": "bun scripts/run-stepdown.ts fix && bun run src/cli.ts",
 		"fastvet": "bun run build && bun typecheck && bun fix && bun run custom-hooks && bun run test:coverage",
 		"vet": "bun run fastvet",
-		"changeset": "changeset",
-		"version": "changeset version",
-		"release": "changeset tag && git push origin --follow-tags",
 		"crap": "bun test --coverage --coverage-reporter=lcov && bunx crap4ts -c coverage/lcov.info -f lcov --exclude \"**/*.test.ts\""
 	},
 	"dependencies": {
@@ -49,7 +46,6 @@
 		"typescript": "npm:@typescript/typescript6@^6.0.2"
 	},
 	"devDependencies": {
-		"@changesets/cli": "^3.0.3",
 		"@graffhyrum/crap4ts": "workspace:*",
 		"@stepdown/analyzer": "workspace:*",
 		"@types/bun": "^1.4.3",

@@ -6,6 +6,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # The Version Packages PR is pushed with GITHUB_TOKEN, which does not trigger workflows;
+  # run CI on its branch manually before merging it.
+  workflow_dispatch:
 
 permissions:
   contents: read

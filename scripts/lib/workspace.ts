@@ -12,7 +12,9 @@ export const TOOL_PACKAGES: readonly ToolPackage[] = [
   {
     dir: "packages/stepdown-rule",
     gates: ["vet", "lint", "compile:release"],
-    extraAssets: ["dist/release", "scripts/install.sh", "scripts/install.ps1"],
+    // Platform binaries and SHA256SUMS only. The old repo's install.sh/install.ps1 hardcode
+    // graffhyrum/stepdown-rule releases/latest and are not shipped from this repo.
+    extraAssets: ["dist/release"],
   },
   { dir: "packages/crap4ts", gates: ["vet", "fmt:check"], extraAssets: [] },
   // build before the template so the mutate4ts bin (dist/index.js) exists for its gate.
