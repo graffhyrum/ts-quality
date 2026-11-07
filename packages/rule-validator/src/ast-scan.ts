@@ -1,0 +1,60 @@
+import type { ProjectConfig } from "./config.ts";
+import { AST_SCAN_DEFAULT_EXCLUDES } from "./exclude-patterns.ts";
+import type { DisplayViolation, JsonViolation, ScanResult } from "./index.ts";
+import { AST_RULES } from "./rules/all-rules.ts";
+import type { RuleResult } from "./rules/runner.ts";
+import { runRules } from "./rules/runner.ts";
+import { createAnalyzer } from "./typescript/compiler.ts";
+
+export type { JsonViolation } from "./index.ts";
+
+export interface AstScanOptions {
+	json?: boolean;
+	excludePatterns?: readonly string[];
+	config?: ProjectConfig;
+}
+
+export async function runAstRules(pattern: string, options?: AstScanOptions): Promise<ScanResult> {
+	const base = options?.excludePatterns ?? AST_SCAN_DEFAULT_EXCLUDES;
+	const extra = options?.config?.exclude ?? [];
+	const excludePatterns = [...base, ...extra];
+	const ruleExcludes = options?.config?.rules ?? {};
+	const analyzer = await createAnalyzer({ pattern, excludePatterns });
+	const results: RuleResult[] = runRules({ analyzer, rules: AST_RULES, ruleExcludes });
+	return toScanResult(results, options?.json);
+}
+
+function toScanResult(results: RuleResult[], json?: boolean): ScanResult {
+	let errorCount = 0;
+	let warningCount = 0;
+	const displayViolations: DisplayViolation[] = [];
+	for (const result of results) {
+		for (const v of result.violations) {
+			if (v.severity === "error") errorCount++;
+			else warningCount++;
+			displayViolations.push({
+				file: result.file,
+				line: v.location.line,
+				column: v.location.column,
+				rule: { name: v.rule.name, message: v.message, severity: v.severity },
+				match: v.code,
+			});
+		}
+	}
+	const violations = json ? collectJsonViolations(results) : undefined;
+	return { errorCount, warningCount, violations, displayViolations };
+}
+
+function collectJsonViolations(results: RuleResult[]): JsonViolation[] {
+	return results.flatMap((r) =>
+		r.violations.map((v) => ({
+			file: r.file,
+			line: v.location.line,
+			column: v.location.column,
+			rule: v.rule.name,
+			message: v.message,
+			severity: v.severity,
+			match: v.code,
+		})),
+	);
+}

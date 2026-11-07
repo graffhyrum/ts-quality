@@ -1,0 +1,52 @@
+# dependencies (bun install)
+node_modules
+
+# output
+out
+dist
+*.tgz
+
+# code coverage
+coverage
+*.lcov
+
+# logs
+logs
+_.log
+report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
+
+# dotenv environment variable files
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+
+# caches
+.eslintcache
+.cache
+*.tsbuildinfo
+
+# IntelliJ based IDEs
+.idea
+
+# Finder (MacOS) folder config
+.DS_Store
+
+# Local development artifacts
+debug-cast.ts
+telemetry-id
+.sisyphus/
+.specstory/
+
+# bv (beads viewer) local config and caches
+.bv/
+.claude/
+
+# beads issue DB / exports (PII); not shipped in public repo
+.beads/
+
+# Dolt database files (added by bd init)
+.dolt/
+*.db
+dolt-monitor.pid.lock
