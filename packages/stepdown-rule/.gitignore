@@ -1,0 +1,49 @@
+# dependencies (bun install)
+node_modules
+
+# output
+out
+dist
+*.tgz
+
+# code coverage
+coverage
+*.lcov
+
+# logs
+logs
+_.log
+report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
+
+# dotenv environment variable files
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+
+# test temp dirs (createTempDir)
+tests/uj1-*
+tests/*-temp
+
+# caches
+.eslintcache
+.cache
+.mcp_data
+*.tsbuildinfo
+
+# IntelliJ based IDEs
+.idea
+
+# Finder (MacOS) folder config
+.DS_Store
+telemetry-id
+
+# bv (beads viewer) local config and caches
+.bv/
+
+# Dolt database
+.dolt/
+*.db
+# br doctor per-run artifacts
+.doctor/
