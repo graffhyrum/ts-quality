@@ -26,26 +26,43 @@ whole graph and a fix lands in one change.
 | `bun run smoke:export <emptyDir>` | packs tarballs, checks contents, exports the template, installs it over HTTP in a fresh git repo, asserts no `core.hooksPath`, re-installs with `--frozen-lockfile`, runs its `vet` and `build` |
 
 ## Versions and tags
-- Changesets owns versions (`.changeset/`). `privatePackages.tag` is `false`: Changesets never
-  tags; versions come from each `package.json`, never from imported tag names.
-- `version.yml` only opens the "Version Packages" PR.
-- Release tag per package: `<dir>-v<version>` (e.g. `stepdown-rule-v0.4.7`), URL-safe and distinct
-  from imported `<dir>/v<version>` tags.
+- Changesets owns versions (`.changeset/`, root `@changesets/cli` only). `privatePackages.tag` is
+  `false`: Changesets never tags. `bun run version-packages` runs `changeset version && bun install`
+  so workspace versions in `bun.lock` stay current.
+- `version.yml` only opens the "Version Packages" PR. That PR is pushed with `GITHUB_TOKEN`, which
+  does not trigger workflows: run CI on its branch with "Run workflow" (`ci.yml` has
+  `workflow_dispatch`) before merging.
+- Release tag per package: `<dir>-v<version>` (e.g. `stepdown-rule-v0.4.7`). Imported tags keep
+  `<dir>/v<version>`.
+
+## Release readiness (fail-closed)
+`bun run release:plan <dir> --release --repo owner/name` refuses unless the ref is `refs/heads/main`,
+the tree is clean, no changesets are pending, and every tool package's version was never released
+(neither imported `<dir>/v<version>` nor new `<dir>-v<version>`) and is above every released version.
+A package whose `<dir>-v<version>` tag exists and is unchanged since is skipped; changed since is an
+error. Without `--release` the plan is a dry run (`kind: "dry-run"`) used by CI smoke; draft-releases
+accepts only `kind: "release"` manifests built at the checked-out commit.
 
 ## Distribution
-- `release.yml` is manual (`workflow_dispatch`). It reruns every gate, packs with
-  `scripts/release-plan.ts` (tarball names, sha256, asset URLs in `manifest.json`), and creates
-  DRAFT releases for versions without one. Drafts are not public and create no tag until a
-  maintainer publishes them.
-- Consumers install a tool with its release asset URL, for example
+- `release.yml`: manual, main only, serialized, clean checkout of the dispatched commit, every gate,
+  readiness, then DRAFT releases. Notes carry the package CHANGELOG section, install URL, and the
+  sha256 of every asset. Drafts are not public and create no tag until a maintainer publishes them.
+- Tools install by release asset URL, e.g.
   `bun add -d https://github.com/<owner>/ts-quality/releases/download/crap4ts-v2.1.4/graffhyrum-crap4ts-2.1.4.tgz`.
-- No registry publication runs from this repo. crap4ts' existing GitHub Packages publication
-  lives in its original repo and is unchanged.
+- stepdown-rule standalone binaries: the `stepdown-rule-v<version>` release carries the five platform
+  binaries and `SHA256SUMS`. Download yours from that release page, check it against `SHA256SUMS`,
+  and put it on PATH. `install.sh`/`install.ps1` are not shipped from this repo because they target
+  the original repo's `releases/latest`; the original repo's releases keep them.
+- After a maintainer publishes drafts, `bun scripts/verify-release.ts <planDir> <emptyDir>`
+  downloads every asset from its public URL, re-hashes it against the manifest, installs each
+  tarball by URL, and runs each bin with `--help`.
+- No registry publication runs from this repo. crap4ts' GitHub Packages publication lives in its
+  original repo and is unchanged.
 - The original repos stay as they are; existing `github:graffhyrum/<tool>#vX` installs keep
   working. They are not synced from here.
 
 ## Standalone template
-`bun scripts/export-template.ts <emptyDir> <specs.json>` copies the template's tracked files
+`bun scripts/export-template.ts <emptyDir> <specs.json>` copies the template's files as committed at HEAD (refusing uncommitted template changes)
 (minus lockfile, hooks, env files, caches), replaces every `workspace:` specifier with the
 mapped specifier (refusing unmapped ones), and refuses non-empty destinations. The export has no
 `bun.lock`: the first `bun install` in the exported project generates it against the release
