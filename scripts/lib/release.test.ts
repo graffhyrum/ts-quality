@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { assetNameProblems, parsePlanArgs } from "./args.ts";
 import { changelogSection } from "./changelog.ts";
 import { dirtyPaths } from "./export.ts";
+import { latestPublished, notedSha256 } from "./published.ts";
 import {
   compareSemver,
   packageVerdict,
@@ -193,5 +194,43 @@ describe("workflows", () => {
       s.uses?.startsWith("changesets/action"),
     );
     expect(action.with.publish).toBeUndefined();
+  });
+});
+
+describe("published release selection", () => {
+  const rel = (tagName: string, isDraft = false, isPrerelease = false) => ({
+    tagName,
+    isDraft,
+    isPrerelease,
+  });
+
+  test("picks the newest published release for the tool, ignoring drafts, prereleases, and other tools", () => {
+    const releases = [
+      rel("crap4ts-v2.1.4"),
+      rel("crap4ts-v2.10.0", true),
+      rel("crap4ts-v2.2.0", false, true),
+      rel("crap4ts-v2.1.10"),
+      rel("mutate4ts-v9.0.0"),
+    ];
+    expect(latestPublished("crap4ts", releases)).toEqual({
+      tag: "crap4ts-v2.1.10",
+      version: "2.1.10",
+    });
+  });
+
+  test("returns null when the tool has no published release (fail closed)", () => {
+    expect(
+      latestPublished("stepdown-rule", [rel("stepdown-rule-v0.4.7", true)]),
+    ).toBeNull();
+  });
+
+  test("reads the sha256 recorded for an asset in release notes", () => {
+    const sha = "a".repeat(64);
+    expect(notedSha256(`- \`x-1.0.0.tgz\` \`${sha}\``, "x-1.0.0.tgz")).toBe(
+      sha,
+    );
+    expect(
+      notedSha256(`- \`x-1.0.0.tgz\` \`${sha}\``, "y-1.0.0.tgz"),
+    ).toBeNull();
   });
 });

@@ -23,6 +23,21 @@ const problems = assetNameProblems(
   manifest.entries.flatMap((e) => e.assets.map((a) => a.path)),
 );
 if (problems.length > 0) throw new Error(problems.join("; "));
+// Preflight every tag before creating anything, so a run never starts on top of leftovers.
+const existing: string[] = [];
+for (const entry of manifest.entries) {
+  const view = await run(
+    ["gh", "release", "view", entry.tag, "--repo", manifest.repo],
+    { capture: true },
+  );
+  if (view.exitCode === 0) existing.push(entry.tag);
+}
+if (existing.length > 0) {
+  throw new Error(
+    `releases already exist for ${existing.join(", ")}. If they are drafts left by an interrupted run, ` +
+      "review and delete them (gh release delete <tag> --repo <repo>) or publish them, then rerun.",
+  );
+}
 for (const entry of manifest.entries)
   await draft(manifest.repo, entry, head, planDir);
 
@@ -32,14 +47,6 @@ async function draft(
   target: string,
   dir: string,
 ): Promise<void> {
-  const existing = await run(
-    ["gh", "release", "view", entry.tag, "--repo", repo],
-    { capture: true },
-  );
-  if (existing.exitCode === 0)
-    throw new Error(
-      `${entry.tag} already has a release; readiness should have excluded it`,
-    );
   const notesPath = path.join(dir, `${entry.tag}.notes.md`);
   await Bun.write(notesPath, `${entry.notes}\n`);
   await mustRun([

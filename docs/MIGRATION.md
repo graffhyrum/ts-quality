@@ -76,3 +76,16 @@ before committing; CI runs the same gate.
 - Verified locally: every gate above, including install over a local HTTP server.
 - Pending a real release: download from an actual GitHub release asset URL, and the first export
   pushed to `graffhyrum/ts-template`.
+
+## Follow-up notes
+- Pending ts-template changesets are genuinely unreleased: in the original ts-template history,
+  all five were added by commits that descend from the 0.2.0 version commit (`44573ea`,
+  2026-01-06): `quality-gate` (b3bbb8e), `todo-app` (e24a05a), `mutate4ts-gate` (3f81280),
+  `rule-validator-1-2-audit` (4d1e7b6), `mutate4ts-v1-pin` (7234ef8). No 0.2.x release followed.
+- `bun scripts/template-specs.ts <out.json> --repo owner/name` maps every tool to its newest
+  PUBLISHED release (not just the latest release run), downloads each tarball, and checks it against
+  the sha256 in that release's notes. It fails closed if any tool has no published release. Its
+  output is the specs file for `export-template.ts`.
+- `draft-releases.ts` checks every tag before creating any draft. If a run stops partway, the next
+  run refuses and names the leftover releases; review and delete leftover drafts
+  (`gh release delete <tag> --repo <repo>`) or publish them, then rerun.
