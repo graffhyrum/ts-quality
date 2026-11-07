@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Multi-tenant Todo</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 640px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+      h1 {
+        font-size: 1.5rem;
+      }
+      .row {
+        display: flex;
+        gap: 0.5rem;
+        margin: 0.5rem 0;
+      }
+      .todo {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.25rem 0;
+      }
+      .done {
+        text-decoration: line-through;
+        color: #888;
+      }
+      button {
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Multi-tenant Todo</h1>
+    <div class="row">
+      <select id="tenant"></select>
+      <input id="new-tenant" placeholder="New tenant name" />
+      <button id="add-tenant">Add tenant</button>
+    </div>
+    <div class="row">
+      <input id="new-todo" placeholder="New todo" />
+      <button id="add-todo">Add todo</button>
+    </div>
+    <div id="todos"></div>
+    <script type="module" src="./client.ts"></script>
+  </body>
+</html>
