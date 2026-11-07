@@ -84,8 +84,10 @@ before committing; CI runs the same gate.
   `rule-validator-1-2-audit` (4d1e7b6), `mutate4ts-v1-pin` (7234ef8). No 0.2.x release followed.
 - `bun scripts/template-specs.ts <out.json> --repo owner/name` maps every tool to its newest
   PUBLISHED release (not just the latest release run), downloads each tarball, and checks it against
-  the sha256 in that release's notes. It fails closed if any tool has no published release. Its
+  the sha256 in that release's notes. It fails closed if any tool has no published release. Downloads are anonymous, so they only
+  succeed once the repo and its releases are public; against a private repo it fails closed. Its
   output is the specs file for `export-template.ts`.
-- `draft-releases.ts` checks every tag before creating any draft. If a run stops partway, the next
+- `draft-releases.ts` checks every tag before creating any draft; only gh's exact `release not found`
+  counts as absent, and any other lookup failure (auth, network, rate limit) stops the run. If a run stops partway, the next
   run refuses and names the leftover releases; review and delete leftover drafts
   (`gh release delete <tag> --repo <repo>`) or publish them, then rerun.

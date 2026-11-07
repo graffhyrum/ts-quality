@@ -7,6 +7,7 @@ import { parseArgs } from "node:util";
 import path from "node:path";
 import { mustRun } from "./lib/run.ts";
 import {
+  assetCheckProblem,
   latestPublished,
   notedSha256,
   type ReleaseInfo,
@@ -32,22 +33,23 @@ if (
   );
 }
 const repo = values.repo;
-const releases: ReleaseInfo[] = JSON.parse(
+// Paginate the REST API so a long release history never truncates the newest per-tool release.
+const releases: ReleaseInfo[] = (
   await mustRun(
     [
       "gh",
-      "release",
-      "list",
-      "--repo",
-      repo,
-      "--limit",
-      "200",
-      "--json",
-      "tagName,isDraft,isPrerelease",
+      "api",
+      "--paginate",
+      `repos/${repo}/releases`,
+      "--jq",
+      ".[] | {tagName: .tag_name, isDraft: .draft, isPrerelease: .prerelease}",
     ],
     { capture: true },
-  ),
-);
+  )
+)
+  .split("\n")
+  .filter(Boolean)
+  .map((line) => JSON.parse(line) as ReleaseInfo);
 const specs: Record<string, string> = {};
 const problems: string[] = [];
 for (const tool of TOOL_PACKAGES) {
@@ -75,10 +77,9 @@ for (const tool of TOOL_PACKAGES) {
         .update(await res.arrayBuffer())
         .digest("hex")
     : null;
-  if (!expected || actual !== expected) {
-    problems.push(
-      `${name}: ${url} HTTP ${res.status}, sha256 ${actual ?? "-"} vs notes ${expected ?? "missing"}`,
-    );
+  const problem = assetCheckProblem(expected, res.status, actual);
+  if (problem !== null) {
+    problems.push(`${name}: ${url}: ${problem}`);
     continue;
   }
   specs[name] = url;

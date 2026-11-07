@@ -2,6 +2,7 @@
 // tag until a maintainer publishes them. Usage (CI): bun scripts/draft-releases.ts <planDir>
 import path from "node:path";
 import { assetNameProblems } from "./lib/args.ts";
+import { classifyReleaseLookup } from "./lib/published.ts";
 import { mustRun, run } from "./lib/run.ts";
 import type { PlanEntry, PlanManifest } from "./release-plan.ts";
 
@@ -28,9 +29,15 @@ const existing: string[] = [];
 for (const entry of manifest.entries) {
   const view = await run(
     ["gh", "release", "view", entry.tag, "--repo", manifest.repo],
-    { capture: true },
+    { capture: true, captureStderr: true },
   );
-  if (view.exitCode === 0) existing.push(entry.tag);
+  const lookup = classifyReleaseLookup(view.exitCode, view.stderr);
+  if (lookup === "error") {
+    throw new Error(
+      `could not check release ${entry.tag}: ${view.stderr.trim()}`,
+    );
+  }
+  if (lookup === "exists") existing.push(entry.tag);
 }
 if (existing.length > 0) {
   throw new Error(

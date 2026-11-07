@@ -2,7 +2,12 @@ import { describe, expect, test } from "bun:test";
 import { assetNameProblems, parsePlanArgs } from "./args.ts";
 import { changelogSection } from "./changelog.ts";
 import { dirtyPaths } from "./export.ts";
-import { latestPublished, notedSha256 } from "./published.ts";
+import {
+  assetCheckProblem,
+  classifyReleaseLookup,
+  latestPublished,
+  notedSha256,
+} from "./published.ts";
 import {
   compareSemver,
   packageVerdict,
@@ -232,5 +237,53 @@ describe("published release selection", () => {
     expect(
       notedSha256(`- \`x-1.0.0.tgz\` \`${sha}\``, "y-1.0.0.tgz"),
     ).toBeNull();
+  });
+});
+
+describe("release lookup fails closed", () => {
+  test("only gh's exact not-found message counts as absent", () => {
+    expect(classifyReleaseLookup(0, "")).toBe("exists");
+    expect(classifyReleaseLookup(1, "release not found\n")).toBe("absent");
+  });
+
+  test("auth, network, and rate-limit failures are errors", () => {
+    expect(classifyReleaseLookup(1, "HTTP 401: Bad credentials")).toBe("error");
+    expect(
+      classifyReleaseLookup(1, "dial tcp: lookup api.github.com: no such host"),
+    ).toBe("error");
+    expect(classifyReleaseLookup(1, "HTTP 403: API rate limit exceeded")).toBe(
+      "error",
+    );
+    expect(classifyReleaseLookup(4, "")).toBe("error");
+  });
+});
+
+describe("template spec asset checks", () => {
+  const sha = "b".repeat(64);
+
+  test("a matching download passes", () => {
+    expect(assetCheckProblem(sha, 200, sha)).toBeNull();
+  });
+
+  test("a failed download fails closed and names the public-repo requirement", () => {
+    expect(assetCheckProblem(sha, 404, null)).toContain("HTTP 404");
+    expect(assetCheckProblem(sha, 404, null)).toContain("public repo");
+  });
+
+  test("a hash mismatch or missing noted hash fails", () => {
+    expect(assetCheckProblem(sha, 200, "c".repeat(64))).toContain(
+      "does not match",
+    );
+    expect(assetCheckProblem(null, 200, sha)).toContain("no sha256");
+  });
+
+  test("the newest published release wins even when a newer draft exists", () => {
+    const releases = [
+      { tagName: "mutate4ts-v1.0.2", isDraft: true, isPrerelease: false },
+      { tagName: "mutate4ts-v1.0.1", isDraft: false, isPrerelease: false },
+    ];
+    expect(latestPublished("mutate4ts", releases)?.tag).toBe(
+      "mutate4ts-v1.0.1",
+    );
   });
 });
