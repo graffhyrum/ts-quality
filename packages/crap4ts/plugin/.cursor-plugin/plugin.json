@@ -1,0 +1,21 @@
+{
+  "name": "crap4ts",
+  "displayName": "crap4ts",
+  "version": "1.0.0",
+  "description": "Installs the CRAP gate, runs it, and names the next edit from the JSON report.",
+  "author": {
+    "name": "graffhyrum"
+  },
+  "homepage": "https://github.com/graffhyrum/crap4ts",
+  "repository": "https://github.com/graffhyrum/crap4ts",
+  "license": "UNLICENSED",
+  "keywords": [
+    "crap4ts",
+    "CRAP",
+    "coverage",
+    "quality-gate"
+  ],
+  "category": "developer-tools",
+  "skills": "./skills/",
+  "hooks": "./hooks/hooks.json"
+}

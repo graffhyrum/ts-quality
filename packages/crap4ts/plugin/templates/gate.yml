@@ -1,0 +1,22 @@
+name: crap4ts-ci
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+  packages: read
+jobs:
+  crap4ts:
+    runs-on: ubuntu-latest
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      # GITHUB_TOKEN can read @graffhyrum/crap4ts only after this repository is granted package access.
+      - name: Authenticate GitHub Packages
+        run: |
+          printf '%s\n' '@graffhyrum:registry=https://npm.pkg.github.com' "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}" >> "$HOME/.npmrc"
+      - run: bun install
+      - run: bun test --coverage
+      - run: bunx crap4ts -c coverage/lcov.info -f lcov -t 30 --project-threshold 0 -o json
