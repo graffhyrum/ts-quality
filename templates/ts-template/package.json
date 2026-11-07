@@ -24,8 +24,8 @@
     "version-packages": "changeset version",
     "release": "changeset publish",
     "prepare": "husky",
-    "mutate4ts": "bun node_modules/mutate4ts/src/index.ts src/store.ts",
-    "mutate4ts:scan": "bun node_modules/mutate4ts/src/index.ts --scan src/store.ts"
+    "mutate4ts": "mutate4ts src/store.ts",
+    "mutate4ts:scan": "mutate4ts --scan src/store.ts"
   },
   "dependencies": {
     "arkenv": "^0.8.1",

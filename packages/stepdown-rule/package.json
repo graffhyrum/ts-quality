@@ -21,9 +21,14 @@
 		"stepdown-rule": "./src/cli.ts"
 	},
 	"files": [
+		"src",
 		"dist",
+		"!dist/stepdown-rule",
+		"!dist/release",
 		"README.md",
-		"SKILL.md"
+		"SKILL.md",
+		"stepdown-schema.json",
+		"!**/*.test.ts"
 	],
 	"type": "module",
 	"main": "./dist/index.js",
