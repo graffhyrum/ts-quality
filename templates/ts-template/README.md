@@ -27,7 +27,7 @@ Use [Bun](https://bun.sh) `1.4.4`. `packageManager` is `bun@1.4.4`.
 | mutate4ts      | mutation testing on `src/store.ts`            |
 | test           | `bun test` with the sample coverage threshold |
 
-The audit step asks the npm advisory registry for known problems, so `vet` (and the pre-commit hook) needs network access. A new advisory against any dependency, even a transitive one that your change did not touch, makes `vet` fail until you update that dependency (for example with `bun update`) and commit the new lockfile.
+The audit step asks the npm advisory registry for known problems, so `vet` needs network access. A new advisory against any dependency, even a transitive one that your change did not touch, makes `vet` fail until you update that dependency (for example with `bun update`) and commit the new lockfile.
 
 `bun run fmt` writes format fixes. `bun run lint:fix` writes lint fixes.
 
@@ -49,7 +49,7 @@ The sample coverage baseline is 100% functions and 100% lines for gated files. `
 | `bun run fmt`           | Format with `bun fmt`                        |
 | `bun run vet`           | Run the full quality gate                    |
 
-The Husky pre-commit hook runs `bun run vet`.
+No Git hook is installed. Run `bun run vet` before committing; CI runs the same gate.
 
 ## Sample
 
@@ -97,4 +97,4 @@ bun run release
 - `crap4ts` `v2.1.3`
 - `mutate4ts` `v1.0.0`
 - ArkType and arkenv
-- Changesets and Husky
+- Changesets

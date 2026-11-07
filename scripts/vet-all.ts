@@ -1,27 +1,29 @@
 // Runs each workspace's own gates in its own directory and process, so per-package
-// bunfig.toml coverage thresholds and test module caches stay isolated.
-type Gate = { readonly dir: string; readonly scripts: readonly string[] };
+// bunfig.toml thresholds and test module caches stay isolated.
+// Usage: bun scripts/vet-all.ts [--plain-tests] [dir-suffix...]
+//   --plain-tests runs plain sequential `bun test` per package (catches cross-file mock leaks
+//   that the parallel coverage runs hide).
+import { GATED_DIRS } from "./lib/workspace.ts";
+import { run } from "./lib/run.ts";
 
-const gates: readonly Gate[] = [
-	{ dir: "packages/rule-validator", scripts: ["vet", "check"] },
-	{ dir: "packages/stepdown-rule", scripts: ["vet", "lint", "compile:release"] },
-	{ dir: "packages/crap4ts", scripts: ["vet", "fmt:check"] },
-	{ dir: "packages/mutate4ts", scripts: ["vet", "fmt:check", "build"] },
-	{ dir: "templates/ts-template", scripts: ["vet", "build"] },
-];
+const args = process.argv.slice(2);
+const plainTests = args.includes("--plain-tests");
+const only = args.filter((arg) => !arg.startsWith("--"));
 
-const only = process.argv.slice(2);
 const failures: string[] = [];
-for (const gate of gates) {
-	if (only.length > 0 && !only.some((name) => gate.dir.endsWith(name))) continue;
-	for (const script of gate.scripts) {
-		const proc = Bun.spawn(["bun", "run", script], { cwd: gate.dir, stdout: "inherit", stderr: "inherit" });
-		const code = await proc.exited;
-		console.log(`vet-all: ${gate.dir} ${script} -> ${code}`);
-		if (code !== 0) failures.push(`${gate.dir} ${script}`);
-	}
+for (const target of GATED_DIRS) {
+  if (only.length > 0 && !only.some((name) => target.dir.endsWith(name)))
+    continue;
+  const commands = plainTests
+    ? [["bun", "test"]]
+    : target.gates.map((gate) => ["bun", "run", gate]);
+  for (const argv of commands) {
+    const { exitCode } = await run(argv, { cwd: target.dir });
+    console.log(`vet-all: ${target.dir} ${argv.join(" ")} -> ${exitCode}`);
+    if (exitCode !== 0) failures.push(`${target.dir} ${argv.join(" ")}`);
+  }
 }
 if (failures.length > 0) {
-	console.error(`vet-all: failed: ${failures.join(", ")}`);
-	process.exit(1);
+  console.error(`vet-all: failed: ${failures.join(", ")}`);
+  process.exit(1);
 }

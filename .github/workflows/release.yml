@@ -1,0 +1,29 @@
+# Manual release: re-runs every gate, packs, and creates DRAFT releases for versions that
+# have no release yet. A maintainer reviews and publishes each draft; nothing is public
+# or tagged until then. No registry publication happens here.
+name: Draft releases
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  draft:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+      - run: bun install --frozen-lockfile
+      - run: bun audit
+      - run: bun run check:root
+      - run: bun run vet
+      - run: bun run test:plain
+      - run: bun run smoke:export "$RUNNER_TEMP/smoke"
+      - run: bun run release:plan "$RUNNER_TEMP/plan" --repo "$GITHUB_REPOSITORY"
+      - run: bun scripts/draft-releases.ts "$RUNNER_TEMP/plan" "$GITHUB_SHA"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,30 @@
+# Root CI. GitHub only runs workflows under the repository root .github/; the per-package
+# .github directories are imported history and never execute here.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+      - run: bun install --frozen-lockfile
+      - run: bun audit
+      - name: Root scripts (format, lint, typecheck, tests)
+        run: bun run check:root
+      - name: Per-package gates in each package directory
+        run: bun run vet
+      - name: Plain sequential bun test per package
+        run: bun run test:plain
+      - name: Pack, check tarballs, export template, install over HTTP, vet standalone
+        run: bun run smoke:export "$RUNNER_TEMP/smoke"

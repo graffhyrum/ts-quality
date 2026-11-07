@@ -23,7 +23,6 @@
     "vet": "bun scripts/vet.ts",
     "version-packages": "changeset version",
     "release": "changeset publish",
-    "prepare": "husky",
     "mutate4ts": "mutate4ts src/store.ts",
     "mutate4ts:scan": "mutate4ts --scan src/store.ts"
   },
@@ -35,7 +34,6 @@
     "@changesets/cli": "^3.0.3",
     "@total-typescript/ts-reset": "^0.6.1",
     "@types/bun": "^1.4.4",
-    "husky": "^9.1.7",
     "oxlint": "^1.90.0",
     "oxlint-tsgolint": "^7.0.2005",
     "@graffhyrum/crap4ts": "workspace:*",

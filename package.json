@@ -1,15 +1,30 @@
 {
-	"name": "ts-quality",
-	"private": true,
-	"type": "module",
-	"packageManager": "bun@1.4.4",
-	"workspaces": ["packages/*", "templates/*"],
-	"scripts": {
-		"vet": "bun scripts/vet-all.ts",
-		"changeset": "changeset",
-		"version-packages": "changeset version"
-	},
-	"devDependencies": {
-		"@changesets/cli": "^3.0.3"
-	}
+  "name": "ts-quality",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "templates/*"
+  ],
+  "type": "module",
+  "scripts": {
+    "vet": "bun scripts/vet-all.ts",
+    "test:plain": "bun scripts/vet-all.ts --plain-tests",
+    "check:root": "bun run fmt:check && bun run lint && bun run typecheck && bun run test:scripts",
+    "fmt": "bun fmt --no-script scripts package.json",
+    "fmt:check": "bun fmt --no-script --check scripts package.json",
+    "lint": "oxlint scripts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test:scripts": "bun test ./scripts",
+    "release:plan": "bun scripts/release-plan.ts",
+    "smoke:export": "bun scripts/smoke-export.ts",
+    "changeset": "changeset",
+    "version-packages": "changeset version"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^3.0.3",
+    "@types/bun": "^1.4.4",
+    "oxlint": "^1.89.0",
+    "typescript": "^6.0.3"
+  },
+  "packageManager": "bun@1.4.4"
 }

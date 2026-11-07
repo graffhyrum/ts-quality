@@ -1,51 +1,61 @@
-// Exports templates/ts-template as a standalone project.
-// Usage: bun scripts/export-template.ts <outDir> <specs.json>
-// specs.json maps each workspace package name to the specifier a standalone
-// project should install (release tarball URL, registry version, or git tag).
-import { mkdirSync } from "node:fs";
+// Exports templates/ts-template as a standalone project (no workspace links, no hooks).
+// Usage: bun scripts/export-template.ts <emptyOutDir> <specs.json>
+// specs.json maps each workspace dependency name to the specifier a standalone project
+// installs (for releases: the manifest's asset URLs). The export carries no bun.lock;
+// the consumer's first `bun install` generates one against those specifiers, and CI in the
+// generated repo then runs `bun install --frozen-lockfile` against that committed lockfile.
+import { existsSync, mkdirSync, readdirSync } from "node:fs";
 import path from "node:path";
-
-const TEMPLATE_DIR = "templates/ts-template";
+import {
+  hookSetupProblems,
+  isExportable,
+  rewriteWorkspaceSpecs,
+} from "./lib/export.ts";
+import { mustRun } from "./lib/run.ts";
+import { TEMPLATE } from "./lib/workspace.ts";
 
 const [outDir, specsPath] = process.argv.slice(2);
 if (!outDir || !specsPath) {
-	console.error("usage: bun scripts/export-template.ts <outDir> <specs.json>");
-	process.exit(2);
+  console.error(
+    "usage: bun scripts/export-template.ts <emptyOutDir> <specs.json>",
+  );
+  process.exit(2);
 }
-const specs: Record<string, string> = await Bun.file(specsPath).json();
-await exportTemplate(outDir, specs);
+await exportTemplate(path.resolve(outDir), await Bun.file(specsPath).json());
 
-async function exportTemplate(dest: string, specMap: Record<string, string>): Promise<void> {
-	const files = await trackedFiles();
-	for (const file of files) await copyFile(file, dest);
-	await rewriteManifest(path.join(dest, "package.json"), specMap);
-	console.log(`exported ${files.length} files to ${dest}`);
+async function exportTemplate(
+  dest: string,
+  specs: Record<string, string>,
+): Promise<void> {
+  if (existsSync(dest) && readdirSync(dest).length > 0)
+    throw new Error(`refusing to export into non-empty ${dest}`);
+  const files = (await trackedFiles()).filter(isExportable);
+  const pkg = rewriteWorkspaceSpecs(
+    await Bun.file(path.join(TEMPLATE.dir, "package.json")).json(),
+    specs,
+  );
+  const hookProblems = hookSetupProblems(pkg);
+  if (hookProblems.length > 0)
+    throw new Error(
+      `template would install git hooks: ${hookProblems.join("; ")}`,
+    );
+  mkdirSync(dest, { recursive: true });
+  for (const file of files)
+    await Bun.write(
+      path.join(dest, file),
+      Bun.file(path.join(TEMPLATE.dir, file)),
+    );
+  await Bun.write(
+    path.join(dest, "package.json"),
+    `${JSON.stringify(pkg, null, 2)}\n`,
+  );
+  console.log(`export-template: ${files.length} files to ${dest}`);
 }
 
 async function trackedFiles(): Promise<string[]> {
-	const proc = Bun.spawn(["git", "ls-files", "-z", "--", "."], { cwd: TEMPLATE_DIR, stdout: "pipe" });
-	const out = await new Response(proc.stdout).text();
-	if ((await proc.exited) !== 0) throw new Error("git ls-files failed");
-	return out.split("\0").filter((f) => f.length > 0 && f !== "bun.lock");
-}
-
-async function copyFile(file: string, dest: string): Promise<void> {
-	const target = path.join(dest, file);
-	mkdirSync(path.dirname(target), { recursive: true });
-	await Bun.write(target, Bun.file(path.join(TEMPLATE_DIR, file)));
-}
-
-async function rewriteManifest(manifestPath: string, specMap: Record<string, string>): Promise<void> {
-	const pkg = await Bun.file(manifestPath).json();
-	for (const field of ["dependencies", "devDependencies"]) {
-		const deps: Record<string, string> | undefined = pkg[field];
-		if (!deps) continue;
-		for (const [name, spec] of Object.entries(deps)) {
-			if (!spec.startsWith("workspace:")) continue;
-			const replacement = specMap[name];
-			if (!replacement) throw new Error(`no export specifier for workspace dependency ${name}`);
-			deps[name] = replacement;
-		}
-	}
-	await Bun.write(manifestPath, `${JSON.stringify(pkg, null, 2)}\n`);
+  const out = await mustRun(["git", "ls-files", "-z", "--", "."], {
+    cwd: TEMPLATE.dir,
+    capture: true,
+  });
+  return out.split("\0").filter((file) => file.length > 0);
 }
