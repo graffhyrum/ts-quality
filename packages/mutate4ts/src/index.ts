@@ -1,3 +1,4 @@
+#!/usr/bin/env bun
 import { Cause, Effect, Exit, Fiber } from "effect";
 import { parseCliOptions } from "./cli.ts";
 import type { ResolvedOptions } from "./cli.ts";

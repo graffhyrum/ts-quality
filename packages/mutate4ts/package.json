@@ -4,10 +4,12 @@
   "private": true,
   "description": "Mutation testing for TypeScript",
   "bin": {
-    "mutate4ts": "dist/index.js"
+    "mutate4ts": "src/index.ts"
   },
   "files": [
-    "dist/**"
+    "dist/**",
+    "src/**/*.ts",
+    "!src/**/*.test.ts"
   ],
   "main": "dist/index.js",
   "scripts": {

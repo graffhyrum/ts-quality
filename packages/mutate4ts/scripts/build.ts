@@ -21,5 +21,6 @@ console.log("Built dist/index.js");
 
 async function prependShebang(path: string): Promise<void> {
   const content = await Bun.file(path).text();
+  if (content.startsWith("#!")) return;
   await Bun.write(path, `#!/usr/bin/env bun\n${content}`);
 }

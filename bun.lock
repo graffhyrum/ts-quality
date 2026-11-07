@@ -33,7 +33,7 @@
       "name": "mutate4ts",
       "version": "1.0.0",
       "bin": {
-        "mutate4ts": "dist/index.js",
+        "mutate4ts": "src/index.ts",
       },
       "dependencies": {
         "arktype": "^2.2.0",
