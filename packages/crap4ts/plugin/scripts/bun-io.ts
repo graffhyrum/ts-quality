@@ -19,7 +19,8 @@ export function bunMkdirp(path: string): void {
     mkdirSync(path, { recursive: true });
 }
 export function whichBun(command: string): string | null {
-    return Bun.which(command) ?? (command === "bun" ? process.execPath : null);
+    // Bun.which reads the startup PATH unless given one; pass the live value.
+    return Bun.which(command, { PATH: process.env.PATH ?? "" }) ?? (command === "bun" ? process.execPath : null);
 }
 export async function spawnCaptured(command: string, args: string[], cwd: string): Promise<{
     exitCode: number;

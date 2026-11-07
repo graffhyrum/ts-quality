@@ -22,11 +22,17 @@ const mockRules = [
 	},
 ];
 
+// mock.restore() does not undo mock.module, so snapshot the real rules and re-register them after this file.
+const realRules = { ...(await import("./rules")) };
+
 mock.module("./rules", () => ({
 	RULES: mockRules,
 }));
 
-afterAll(() => mock.restore());
+afterAll(() => {
+	mock.module("./rules", () => realRules);
+	mock.restore();
+});
 
 // ?fresh: bypass cli.test.ts mock.module of ./index.ts
 const {

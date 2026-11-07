@@ -36,7 +36,7 @@
 	"dependencies": {
 		"arktype": "^2.2.9",
 		"commander": "^15.0.0",
-		"glob": "^13.0.6",
+		"glob": "^14.0.4",
 		"picocolors": "^1.1.1",
 		"typescript": "npm:@typescript/typescript6@^6.0.2"
 	},
