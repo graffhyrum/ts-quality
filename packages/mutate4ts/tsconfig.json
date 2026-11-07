@@ -10,7 +10,7 @@
     "strict": true,
     "skipLibCheck": true,
     "lib": ["ESNext"],
-    "types": ["bun-types"]
+    "types": ["bun"]
   },
   "include": ["src", "test", "scripts", ".cursor/hooks"]
 }

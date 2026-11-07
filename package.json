@@ -1,0 +1,15 @@
+{
+	"name": "ts-quality",
+	"private": true,
+	"type": "module",
+	"packageManager": "bun@1.4.4",
+	"workspaces": ["packages/*", "templates/*"],
+	"scripts": {
+		"vet": "bun scripts/vet-all.ts",
+		"changeset": "changeset",
+		"version-packages": "changeset version"
+	},
+	"devDependencies": {
+		"@changesets/cli": "^3.0.3"
+	}
+}

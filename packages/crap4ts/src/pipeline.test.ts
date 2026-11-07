@@ -141,6 +141,28 @@ describe("runPipeline filesystem", () => {
     expect(await names("score")).toEqual(["zzz", "aaa"]);
   });
 
+  test("default view lists only crappy functions", async () => {
+    const sourcePath = path.resolve("src/a.ts");
+    const covPath = path.resolve("cov.json");
+    const source = "function zzz() { if (x) return 1; return 2; }\nfunction aaa() { return 1; }\n";
+    const logs: string[] = [];
+    const log = console.log;
+    console.log = (message?: unknown) => {
+      logs.push(String(message));
+    };
+    try {
+      await runPipeline(
+        config({ output: "json", showAll: false, threshold: 1 }),
+        makeFs({ [sourcePath]: source, [covPath]: "{}" }),
+      );
+    } finally {
+      console.log = log;
+    }
+    const parsed = JSON.parse(logs.join("\n")) as { functions: Array<{ isCrappy: boolean }> };
+    expect(parsed.functions.length).toBeGreaterThan(0);
+    expect(parsed.functions.every((f) => f.isCrappy)).toBe(true);
+  });
+
   test("html output is written to the requested file", async () => {
     const sourcePath = path.resolve("src/a.ts");
     const covPath = path.resolve("cov.json");

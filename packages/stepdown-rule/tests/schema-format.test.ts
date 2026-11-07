@@ -21,6 +21,6 @@ test("formatJsonSchema collapses short arrays like oxfmt", async () => {
 
 // Reads HEAD, not the working tree: the build rewrites the working file with the formatter itself.
 function readCommittedSchema(): string {
-	const result = Bun.spawnSync(["git", "show", "HEAD:stepdown-schema.json"], { cwd: repoRoot });
+	const result = Bun.spawnSync(["git", "show", "HEAD:./stepdown-schema.json"], { cwd: repoRoot });
 	return result.stdout.toString();
 }

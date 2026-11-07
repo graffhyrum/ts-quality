@@ -35,12 +35,12 @@
     "@changesets/cli": "^3.0.3",
     "@total-typescript/ts-reset": "^0.6.1",
     "@types/bun": "^1.4.4",
-    "crap4ts": "github:graffhyrum/crap4ts#v2.1.3",
     "husky": "^9.1.7",
-    "mutate4ts": "github:graffhyrum/mutate4ts#v1.0.0",
     "oxlint": "^1.90.0",
     "oxlint-tsgolint": "^7.0.2005",
-    "rule-validator": "github:graffhyrum/rule-validator#v1.2.0",
-    "stepdown-rule": "github:graffhyrum/stepdown-rule#v0.4.5"
+    "@graffhyrum/crap4ts": "workspace:*",
+    "mutate4ts": "workspace:*",
+    "@graff/rule-validator": "workspace:*",
+    "@stepdown/analyzer": "workspace:*"
   }
 }

@@ -19,7 +19,7 @@ type MutationSite = {
 };
 
 type MutatorDef<T extends ts.Node> = {
-  readonly guard: (node: ts.Node) => node is T;
+  readonly isTarget: (node: ts.Node) => node is T;
   readonly mutate: (
     node: T,
     sourceFile: ts.SourceFile,
@@ -28,13 +28,13 @@ type MutatorDef<T extends ts.Node> = {
 };
 
 function adaptMutator<T extends ts.Node>(
-  guard: (node: ts.Node) => node is T,
+  isTarget: (node: ts.Node) => node is T,
   mutate: (node: T, sf: ts.SourceFile, fp: string) => readonly MutationSite[],
 ): MutatorDef<ts.Node> {
   return {
-    guard: (node: ts.Node): node is ts.Node => guard(node),
+    isTarget: (node: ts.Node): node is ts.Node => isTarget(node),
     mutate: (node: ts.Node, sf: ts.SourceFile, fp: string) =>
-      guard(node) ? mutate(node, sf, fp) : [],
+      isTarget(node) ? mutate(node, sf, fp) : [],
   };
 }
 

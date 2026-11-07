@@ -28,7 +28,7 @@ function collectMutations(
   sites: MutationSite[],
 ): void {
   for (const def of allMutators) {
-    if (def.guard(node)) sites.push(...def.mutate(node, sourceFile, filePath));
+    if (def.isTarget(node)) sites.push(...def.mutate(node, sourceFile, filePath));
   }
 }
 

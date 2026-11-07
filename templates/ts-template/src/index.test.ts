@@ -10,7 +10,7 @@ test("startServer responds on /api/tenants", async () => {
 });
 
 test("the entry point starts the server", async () => {
-  const proc = Bun.spawn(["bun", "src/index.ts"], {
+  const proc = Bun.spawn([process.execPath, "src/index.ts"], {
     stdout: "pipe",
     stderr: "pipe",
     env: { ...process.env, PORT: "4317" },
