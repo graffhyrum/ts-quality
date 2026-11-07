@@ -1,0 +1,21 @@
+/tmp
+/out-tsc
+.DS_Store
+.idea/
+
+/node_modules
+coverage/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+/.pnp
+.pnp.js
+dist/
+
+.vscode/*
+/.claude/
+
+# Dolt database files (added by bd init)
+.beads/
+.dolt/
+*.db
