@@ -8,6 +8,13 @@
 - README: overhaul for first-screen clarity and leaner structure; address CodeRabbit review findings. See commits ab66c7f, bc192fe.
 - Docs: de-slopify README and AGENTS prose; add GitHub OG share image (1280x640); de-slopify src comments.
 
+## 0.4.7
+
+### Patch Changes
+
+- 2137b4c: Packaging for release tarballs: `files` now ships the `src` bin targets and excludes test files, compiled release binaries, and local tool data; rule-validator declares its direct `minimatch` dependency.
+- 9f88f5c: fix(deps): upgrade glob to ^14.0.4 and minimatch to ^11.0.5 to resolve GHSA-3g3m-2fjr-6pw4 and GHSA-g3hv-75wg-m249.
+
 ## 0.4.6
 
 ### Patch Changes

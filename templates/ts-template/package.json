@@ -1,6 +1,6 @@
 {
   "name": "ts-template",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Personal TypeScript project template with a quiet quality gate.",
   "module": "src/index.ts",
   "type": "module",

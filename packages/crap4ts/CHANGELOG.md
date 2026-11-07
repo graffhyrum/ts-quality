@@ -1,5 +1,11 @@
 # @graffhyrum/crap4ts
 
+## 2.1.4
+
+### Patch Changes
+
+- 149abaf: Relicense under MIT (was UNLICENSED) and ship the LICENSE file in the package.
+
 ## 2.1.3
 
 ### Patch Changes

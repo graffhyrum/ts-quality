@@ -1,5 +1,12 @@
 # @graff/rule-validator
 
+## 1.2.1
+
+### Patch Changes
+
+- 2137b4c: Packaging for release tarballs: `files` now ships the `src` bin targets and excludes test files, compiled release binaries, and local tool data; rule-validator declares its direct `minimatch` dependency.
+- 9f88f5c: fix(deps): upgrade glob to ^14.0.4 to resolve GHSA-3g3m-2fjr-6pw4 and GHSA-g3hv-75wg-m249.
+
 ## 1.2.0
 
 ### Minor Changes
