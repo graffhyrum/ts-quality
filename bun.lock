@@ -13,7 +13,7 @@
     },
     "packages/crap4ts": {
       "name": "@graffhyrum/crap4ts",
-      "version": "2.1.3",
+      "version": "2.1.4",
       "bin": {
         "crap4ts": "src/index.ts",
       },
@@ -31,7 +31,7 @@
     },
     "packages/mutate4ts": {
       "name": "mutate4ts",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "bin": {
         "mutate4ts": "src/index.ts",
       },
@@ -57,7 +57,7 @@
     },
     "packages/rule-validator": {
       "name": "@graff/rule-validator",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "bin": {
         "rule-validator": "./src/cli.ts",
       },
@@ -81,7 +81,7 @@
     },
     "packages/stepdown-rule": {
       "name": "@stepdown/analyzer",
-      "version": "0.4.6",
+      "version": "0.4.7",
       "bin": {
         "stepdown-rule": "./src/cli.ts",
       },
@@ -104,7 +104,7 @@
     },
     "templates/ts-template": {
       "name": "ts-template",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "dependencies": {
         "arkenv": "^0.8.1",
         "arktype": "^2.2.9",

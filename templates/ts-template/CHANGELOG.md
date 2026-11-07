@@ -1,5 +1,18 @@
 # ts-template
 
+## 0.3.0
+
+### Minor Changes
+
+- b3bbb8e: Replace the init CLI with a clone-and-vet project template. Add a quiet quality gate: bun fmt, bun check, oxlint, rule-validator, stepdown-rule, crap4ts, and a coverage threshold.
+- e24a05a: Expand the template with a Bun + vanilla TS multi-tenant web todo app.
+
+### Patch Changes
+
+- 3f81280: Add mutate4ts to the quality gate and normalize quality gate dependency keys.
+- 7234ef8: Pin mutate4ts to the v1.0.0 tag instead of main.
+- 4d1e7b6: Bump rule-validator to v1.2.0 and add bun audit to the quality gate.
+
 ## 0.2.0
 
 ### Minor Changes
