@@ -1,9 +1,10 @@
 // `doctor undo <run-id>`: walk actions.jsonl in reverse and restore each
 // mutation from its verbatim backup. Created files are moved to the run's
-// quarantine/ (never deleted). Fails closed on any hash mismatch.
+// quarantine/ (never deleted). Fails closed on any hash mismatch and on any
+// path outside the repository (targets) or the run directory (backups).
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { sha256, writeAtomic } from "./fs-utils.ts";
+import { resolveInside, sha256, writeAtomic } from "./fs-utils.ts";
 
 export interface UndoResult {
 	restored: number;
@@ -22,21 +23,17 @@ interface ActionLine {
 
 interface UndoTarget {
 	runDir: string;
-	doctorDir: string;
+	scopeRoot: string;
+	file: string;
 	action: ActionLine;
 	result: UndoResult;
 }
 
-export async function undoRun(
-	runDir: string,
-	doctorDir: string,
-	actionsPath?: string,
-): Promise<UndoResult> {
-	const actionsFile = actionsPath ?? path.join(runDir, "actions.jsonl");
-	const lines = await readActions(actionsFile);
+export async function undoRun(runDir: string, scopeRoot: string): Promise<UndoResult> {
+	const lines = await readActions(path.join(runDir, "actions.jsonl"));
 	const result: UndoResult = { restored: 0, skipped: [], errors: [] };
 	for (const action of [...lines].reverse()) {
-		await undoOne({ runDir, doctorDir, action, result });
+		await undoOne({ runDir, scopeRoot, action, result });
 	}
 	return result;
 }
@@ -70,30 +67,28 @@ async function readActions(actionsFile: string): Promise<ActionLine[]> {
 	return actions;
 }
 
-async function undoOne(target: UndoTarget): Promise<void> {
-	const { action } = target;
+async function undoOne(parts: Omit<UndoTarget, "file">): Promise<void> {
+	const { action, result } = parts;
 	if (action.op === "unreadable") {
-		target.result.skipped.push("unreadable actions.jsonl line — refusing to guess");
+		result.skipped.push("unreadable actions.jsonl line — refusing to guess");
 		return;
 	}
+	const file = await resolveInside(parts.scopeRoot, action.path);
+	if (!file) {
+		result.errors.push(`${action.path}: outside the repository — refusing to touch it`);
+		return;
+	}
+	const target = { ...parts, file };
 	if (!action.existed) {
-		await quarantineCreated(target.doctorDir, action, target.result);
+		await quarantineCreated(target);
 		return;
 	}
-	await restoreFromBackup({
-		runDir: target.runDir,
-		doctorDir: target.doctorDir,
-		action: target.action,
-		result: target.result,
-	});
+	await restoreFromBackup(target);
 }
 
-async function quarantineCreated(
-	doctorDir: string,
-	action: ActionLine,
-	result: UndoResult,
-): Promise<void> {
-	const current = await fs.readFile(action.path).catch(() => null);
+async function quarantineCreated(target: UndoTarget): Promise<void> {
+	const { file, action, result } = target;
+	const current = await fs.readFile(file).catch(() => null);
 	if (!current) {
 		result.skipped.push(`${action.path}: already gone, nothing to undo`);
 		return;
@@ -104,26 +99,27 @@ async function quarantineCreated(
 		);
 		return;
 	}
-	const quarantine = path.join(doctorDir, "quarantine", path.basename(action.path));
+	const quarantine = path.join(target.runDir, "quarantine", path.relative(target.scopeRoot, file));
 	await fs.mkdir(path.dirname(quarantine), { recursive: true });
-	await fs.rename(action.path, quarantine);
+	await fs.rename(file, quarantine);
 	result.restored += 1;
 }
 
-async function restoreFromBackup(target: {
-	runDir: string;
-	doctorDir: string;
-	action: ActionLine;
-	result: UndoResult;
-}): Promise<void> {
-	const { runDir, action, result } = target;
+async function restoreFromBackup(target: UndoTarget): Promise<void> {
+	const { runDir, file, action, result } = target;
 	if (!action.backup) {
 		result.errors.push(
 			`${action.path}: actions.jsonl records no backup path — refusing to restore`,
 		);
 		return;
 	}
-	const backupPath = path.join(runDir, action.backup);
+	const backupPath = await resolveInside(runDir, action.backup);
+	if (!backupPath) {
+		result.errors.push(
+			`${action.path}: backup path escapes the run directory — refusing to restore`,
+		);
+		return;
+	}
 	const backup = await fs.readFile(backupPath).catch(() => null);
 	if (!backup) {
 		result.errors.push(
@@ -137,7 +133,23 @@ async function restoreFromBackup(target: {
 		);
 		return;
 	}
-	await writeAtomic(action.path, backup);
+	const current = await fs.readFile(file).catch(() => null);
+	if (current === null) {
+		result.errors.push(`${action.path}: file is missing — refusing to restore`);
+		return;
+	}
+	const currentHash = sha256(current);
+	if (currentHash === action.beforeHash) {
+		result.skipped.push(`${action.path}: already matches its pre-fix content, nothing to undo`);
+		return;
+	}
+	if (currentHash !== action.afterHash) {
+		result.errors.push(
+			`${action.path}: content changed since the fix — refusing to restore (hash mismatch)`,
+		);
+		return;
+	}
+	await writeAtomic(file, backup);
 	result.restored += 1;
 }
 

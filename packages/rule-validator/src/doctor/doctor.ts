@@ -253,7 +253,7 @@ async function readAndValidateConfig(configPath: string): Promise<ConfigState> {
 	if (!result.ok) return { kind: "invalid", configPath, summary: result.summary };
 	return { kind: "ok", config: result.config, configPath };
 }
-async function discoverGit(cwd: string): Promise<{
+export async function discoverGit(cwd: string): Promise<{
 	gitSha: string | null;
 	repoRoot: string | null;
 }> {

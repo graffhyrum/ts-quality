@@ -3,7 +3,8 @@ import path from "node:path";
 import { DOCTOR_CONTRACT_VERSION, DoctorExit } from "./types.ts";
 import { capabilitiesJson, ROBOT_DOCS } from "./capabilities.ts";
 import { latestRunDir, listRuns, undoRun } from "./undo.ts";
-import { runDoctorDiagnose } from "./doctor.ts";
+import { discoverGit, runDoctorDiagnose } from "./doctor.ts";
+import { acquireLock, releaseLock } from "./lock.ts";
 
 export async function runHealth(cwd: string = process.cwd()): Promise<number> {
 	const code = await runDoctorDiagnose({
@@ -54,6 +55,10 @@ export async function runDoctorUndo(
 	runId: string | undefined,
 	cwd: string = process.cwd(),
 ): Promise<number> {
+	if (runId !== undefined && !isRunDirName(runId)) {
+		console.error(`invalid run id "${runId}": expected a single run directory name`);
+		return DoctorExit.usage;
+	}
 	const doctorDir = path.join(cwd, ".doctor");
 	const resolved = await resolveRunDir(doctorDir, runId);
 	if (!resolved) {
@@ -64,8 +69,25 @@ export async function runDoctorUndo(
 		);
 		return DoctorExit.noInput;
 	}
-	const result = await undoRun(resolved, doctorDir);
-	return reportUndo(result);
+	const { repoRoot } = await discoverGit(cwd);
+	if (!repoRoot) {
+		console.error("refusing to undo: cwd is not inside a git repository");
+		return DoctorExit.refused;
+	}
+	const lock = await acquireLock(doctorDir);
+	if (!lock.ok) {
+		console.error(`refusing to undo: cannot hold .doctor/lock (${lock.holder})`);
+		return lock.holder?.startsWith("lock-error") ? DoctorExit.refused : DoctorExit.concurrencyLost;
+	}
+	try {
+		return reportUndo(await undoRun(resolved, repoRoot));
+	} finally {
+		await releaseLock(doctorDir);
+	}
+}
+
+function isRunDirName(runId: string): boolean {
+	return runId !== "" && runId !== "." && runId !== ".." && !/[\\/]/.test(runId);
 }
 
 async function resolveRunDir(doctorDir: string, runId: string | undefined): Promise<string | null> {

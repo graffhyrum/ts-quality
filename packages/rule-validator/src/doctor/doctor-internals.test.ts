@@ -250,7 +250,100 @@ describe("undo paths", () => {
 		expect(existsSync(path.join(dir, ".gitignore"))).toBe(true);
 		expect(await runDoctorUndo("latest", dir)).toBe(0);
 		expect(existsSync(path.join(dir, ".gitignore"))).toBe(false);
-		expect(existsSync(path.join(dir, ".doctor", "quarantine", ".gitignore"))).toBe(true);
+		expect(existsSync(path.join(await readLatestRun(dir), "quarantine", ".gitignore"))).toBe(true);
+	});
+
+	it("keeps each run's quarantined file when two runs created the same file", async () => {
+		gitInit(dir);
+		spyOn(console, "log");
+		const runIds: string[] = [];
+		for (const content of ["first\n", "second\n"]) {
+			expect(await runDoctorDiagnose({ cwd: dir, silent: true, fix: true })).toBe(0);
+			const run = await fs.readlink(path.join(dir, ".doctor", "latest"));
+			runIds.push(path.basename(run));
+			expect(await runDoctorUndo(path.basename(run), dir)).toBe(0);
+			writeFileSync(path.join(run, "quarantine", ".gitignore"), content);
+		}
+		for (const [i, content] of ["first\n", "second\n"].entries()) {
+			const quarantined = path.join(dir, ".doctor", "runs", runIds[i] as string, "quarantine", ".gitignore");
+			expect(readFileSync(quarantined, "utf8")).toBe(content);
+		}
+	});
+
+	it("refuses to restore over edits made after the fix and keeps them (exit 3)", async () => {
+		gitInit(dir);
+		write(path.join(dir, ".gitignore"), "node_modules\n");
+		spyOn(console, "error");
+		expect(await runDoctorDiagnose({ cwd: dir, silent: true, fix: true })).toBe(0);
+		writeFileSync(path.join(dir, ".gitignore"), "node_modules\n.doctor/\nuser-edit\n");
+		expect(await runDoctorUndo("latest", dir)).toBe(3);
+		expect(readFileSync(path.join(dir, ".gitignore"), "utf8")).toBe("node_modules\n.doctor/\nuser-edit\n");
+	});
+
+	it("refuses to restore a file that is missing (exit 3)", async () => {
+		gitInit(dir);
+		write(path.join(dir, ".gitignore"), "node_modules\n");
+		spyOn(console, "error");
+		expect(await runDoctorDiagnose({ cwd: dir, silent: true, fix: true })).toBe(0);
+		rmSync(path.join(dir, ".gitignore"));
+		expect(await runDoctorUndo("latest", dir)).toBe(3);
+		expect(existsSync(path.join(dir, ".gitignore"))).toBe(false);
+	});
+
+	it("skips an action whose target still has its pre-fix content", async () => {
+		gitInit(dir);
+		write(path.join(dir, ".gitignore"), "node_modules\n");
+		const log = spyOn(console, "log");
+		expect(await runDoctorDiagnose({ cwd: dir, silent: true, fix: true })).toBe(0);
+		writeFileSync(path.join(dir, ".gitignore"), "node_modules\n");
+		expect(await runDoctorUndo("latest", dir)).toBe(0);
+		expect(log.mock.calls.flat().join(" ")).toContain("pre-fix content");
+	});
+
+	it("rejects a run id that is not a single directory name (exit 64)", async () => {
+		spyOn(console, "error");
+		write(path.join(dir, "elsewhere", "actions.jsonl"), "");
+		expect(await runDoctorUndo("../../elsewhere", dir)).toBe(64);
+		expect(await runDoctorUndo("..", dir)).toBe(64);
+	});
+
+	it("refuses action and backup paths outside their scopes (exit 3)", async () => {
+		gitInit(dir);
+		const outside = mkdtempSync(path.join(os.tmpdir(), "rv-doctor-outside-"));
+		try {
+			write(path.join(outside, "victim.txt"), "keep\n");
+			const run = path.join(dir, ".doctor", "runs", "20261105T000000Z__abc123");
+			write(path.join(run, "backups", "x"), "keep\n");
+			const victim = path.join(outside, "victim.txt");
+			const lines = [
+				{ path: victim, op: "append", beforeHash: null, afterHash: "", existed: true, backup: "backups/x" },
+				{ path: path.join(dir, ".gitignore"), op: "append", beforeHash: null, afterHash: "", existed: true, backup: path.join(outside, "victim.txt") },
+			];
+			write(path.join(run, "actions.jsonl"), `${lines.map((l) => JSON.stringify(l)).join("\n")}\n`);
+			const error = spyOn(console, "error");
+			expect(await runDoctorUndo("20261105T000000Z__abc123", dir)).toBe(3);
+			expect(error.mock.calls.flat().join(" ")).toContain("outside the repository");
+			expect(error.mock.calls.flat().join(" ")).toContain("escapes the run directory");
+			expect(readFileSync(victim, "utf8")).toBe("keep\n");
+		} finally {
+			rmSync(outside, { recursive: true, force: true });
+		}
+	});
+
+	it("refuses to undo while another live doctor holds the lock (exit 5)", async () => {
+		gitInit(dir);
+		spyOn(console, "log");
+		spyOn(console, "error");
+		expect(await runDoctorDiagnose({ cwd: dir, silent: true, fix: true })).toBe(0);
+		writeFileSync(path.join(dir, ".doctor", "lock"), `pid=${process.pid} started=now\n`);
+		expect(await runDoctorUndo("latest", dir)).toBe(5);
+		expect(existsSync(path.join(dir, ".gitignore"))).toBe(true);
+	});
+
+	it("refuses to undo outside a git repository (exit 4)", async () => {
+		write(path.join(dir, ".doctor", "runs", "20261105T000000Z__abc123", "actions.jsonl"), "");
+		spyOn(console, "error");
+		expect(await runDoctorUndo("20261105T000000Z__abc123", dir)).toBe(4);
 	});
 
 	it("refuses to quarantine a created file whose content changed (exit 3)", async () => {
@@ -309,18 +402,42 @@ async function readLatestRun(dirPath: string): Promise<string> {
 	return path.join(dirPath, ".doctor", "runs", first.run_id);
 }
 
+function exitedPid(): number {
+	const child = Bun.spawnSync(["true"]);
+	return child.pid;
+}
+
 describe("lock", () => {
 	it("reclaims a stale lock and releases cleanly", async () => {
 		const doctorDir = path.join(dir, ".doctor");
 		mkdirSync(doctorDir, { recursive: true });
 		const lockPath = path.join(doctorDir, "lock");
-		writeFileSync(lockPath, "pid=1 started=old\n");
+		writeFileSync(lockPath, `pid=${exitedPid()} started=old\n`);
 		const old = new Date(Date.now() - 60 * 60 * 1000);
 		utimesSync(lockPath, old, old);
 		const result = await acquireLock(doctorDir);
 		expect(result.ok).toBe(true);
 		await releaseLock(doctorDir);
 		expect(existsSync(lockPath)).toBe(false);
+	});
+
+	it("refuses a stale lock whose holder is still running", async () => {
+		const doctorDir = path.join(dir, ".doctor");
+		mkdirSync(doctorDir, { recursive: true });
+		const lockPath = path.join(doctorDir, "lock");
+		writeFileSync(lockPath, `pid=${process.pid} started=old\n`);
+		const old = new Date(Date.now() - 60 * 60 * 1000);
+		utimesSync(lockPath, old, old);
+		const result = await acquireLock(doctorDir);
+		expect(result.ok).toBe(false);
+		expect(result.holder).toContain(`pid=${process.pid}`);
+	});
+
+	it("reclaims a fresh lock whose holder has exited", async () => {
+		const doctorDir = path.join(dir, ".doctor");
+		mkdirSync(doctorDir, { recursive: true });
+		writeFileSync(path.join(doctorDir, "lock"), `pid=${exitedPid()} started=now\n`);
+		expect((await acquireLock(doctorDir)).ok).toBe(true);
 	});
 
 	it("refuses while a fresh lock is held", async () => {
@@ -401,6 +518,18 @@ describe("mutate chokepoint", () => {
 
 	it("resolveInside returns null for traversal outside the root", async () => {
 		expect(await resolveInside(dir, "../../outside.txt")).toBeNull();
+	});
+
+	it("resolveInside rejects a missing child under a symlink that leaves the root", async () => {
+		const outside = mkdtempSync(path.join(os.tmpdir(), "rv-doctor-outside-"));
+		try {
+			Bun.spawnSync(["ln", "-s", outside, path.join(dir, "link")]);
+			Bun.spawnSync(["ln", "-s", path.join(outside, "missing"), path.join(dir, "dangling")]);
+			expect(await resolveInside(dir, "link/new.txt")).toBeNull();
+			expect(await resolveInside(dir, "dangling")).toBeNull();
+		} finally {
+			rmSync(outside, { recursive: true, force: true });
+		}
 	});
 
 	it("resolveInside tolerates nonexistent children and roots", async () => {

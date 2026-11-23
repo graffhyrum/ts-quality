@@ -159,7 +159,7 @@ describe("end-to-end diagnose", () => {
 	it("refuses to fix while the lock is held (exit 5)", async () => {
 		gitInit(dir);
 		write(path.join(dir, ".gitignore"), "node_modules\n");
-		write(path.join(dir, ".doctor", "lock"), "pid=99999 started=2026-11-05T00:00:00Z\n");
+		write(path.join(dir, ".doctor", "lock"), `pid=${process.pid} started=2026-11-05T00:00:00Z\n`);
 		expect(await runDoctorDiagnose({ cwd: dir, silent: true, fix: true })).toBe(5);
 		expect(readFileSync(path.join(dir, ".gitignore"), "utf8")).toBe("node_modules\n");
 	});

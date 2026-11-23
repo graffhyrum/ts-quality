@@ -35,9 +35,24 @@ export async function pathExists(p: string): Promise<boolean> {
 	}
 }
 async function isInsideReal(root: string, resolved: string): Promise<boolean> {
-	const realRoot = await fs.realpath(root).catch(() => path.resolve(root));
-	const realCandidate = await fs.realpath(resolved).catch(() => resolved);
+	const realRoot = await realpathAllowMissing(path.resolve(root));
+	const realCandidate = await realpathAllowMissing(resolved);
+	if (realRoot === null || realCandidate === null) return false;
 	return realCandidate === realRoot || realCandidate.startsWith(realRoot + path.sep);
+}
+/** realpath of `p`; for a missing path, the realpath of its nearest existing ancestor plus the
+ *  missing tail. Null for a dangling symlink or any other resolution error. */
+async function realpathAllowMissing(p: string): Promise<string | null> {
+	try {
+		return await fs.realpath(p);
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code !== "ENOENT") return null;
+		if (await fs.lstat(p).catch(() => null)) return null; // dangling symlink
+		const parent = path.dirname(p);
+		if (parent === p) return null;
+		const realParent = await realpathAllowMissing(parent);
+		return realParent === null ? null : path.join(realParent, path.basename(p));
+	}
 }
 /** Write `content` to `target` atomically (tmp in same dir + rename). */
 export async function writeAtomic(target: string, content: Buffer): Promise<void> {

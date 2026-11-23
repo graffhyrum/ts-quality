@@ -49,7 +49,6 @@ export async function mutate(
 	}
 	const next = apply(current);
 	const afterHash = sha256Buffer(Buffer.from(next));
-	await atomicWriteFile(targetPath, next);
 	const record: ActionRecord = {
 		path: targetPath,
 		op,
@@ -58,8 +57,10 @@ export async function mutate(
 		timestamp: new Date().toISOString(),
 		runId: ctx.runId,
 	};
-	const line = `${JSON.stringify(record)}\n`;
-	await appendLine(ctx.actionsPath, line);
+	// Log before writing: a changed target always has its action, and undo skips
+	// an action whose target still has beforeHash.
+	await appendLine(ctx.actionsPath, `${JSON.stringify(record)}\n`);
+	await atomicWriteFile(targetPath, next);
 	return record;
 }
 

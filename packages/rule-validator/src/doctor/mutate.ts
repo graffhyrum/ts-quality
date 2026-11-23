@@ -1,6 +1,8 @@
 // mutate(): the ONLY code path under `doctor --fix` allowed to write project
-// files. Backs up verbatim first, writes atomically, records hashes + the
-// action in `.doctor/runs/<run-id>/actions.jsonl`.
+// files. Backs up verbatim first, records hashes + the action in
+// `.doctor/runs/<run-id>/actions.jsonl`, then writes atomically. Logging before
+// the write means a change on disk always has its action; undo checks hashes,
+// so an action whose write never happened is skipped.
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { pathExists, resolveInside, backupVerbatim, writeAtomic, sha256 } from "./fs-utils.ts";
@@ -25,7 +27,6 @@ export async function mutate(run: RunContext, req: MutateRequest): Promise<Docto
 	const backupRel = backupPathFor(req.scopeRoot, target);
 	if (existed) await backupVerbatim(target, run.backupsDir, backupRel);
 	const next = await computeNextBytes(target, existed, req);
-	await writeAtomic(target, next);
 	const after = sha256(next);
 	const action: DoctorAction = {
 		path: target,
@@ -40,6 +41,7 @@ export async function mutate(run: RunContext, req: MutateRequest): Promise<Docto
 		run_id: run.runId,
 		backup: existed ? path.join("backups", backupRel) : null,
 	});
+	await writeAtomic(target, next);
 	return action;
 }
 

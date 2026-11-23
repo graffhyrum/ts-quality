@@ -67,7 +67,11 @@ export async function applyFixes(
 	return outcomes;
 }
 
-export function gcRuns(before: string, yes: boolean): { removed: string[]; refused: boolean } {
+export function gcRuns(
+	before: string,
+	yes: boolean,
+	dryRun = false,
+): { removed: string[]; refused: boolean } {
 	if (!yes) return { removed: [], refused: true };
 	const cutoff = new Date(before).getTime();
 	if (Number.isNaN(cutoff)) return { removed: [], refused: true };
@@ -85,7 +89,7 @@ export function gcRuns(before: string, yes: boolean): { removed: string[]; refus
 		try {
 			const st = statSync(p);
 			if (st.isDirectory() && st.mtimeMs < cutoff) {
-				rmSync(p, { recursive: true, force: true });
+				if (!dryRun) rmSync(p, { recursive: true, force: true });
 				removed.push(name);
 			}
 		} catch {

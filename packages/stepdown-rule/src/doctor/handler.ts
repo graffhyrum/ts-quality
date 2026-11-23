@@ -1,6 +1,6 @@
 import { statSync } from "node:fs";
 import { resolve } from "node:path";
-import { acquireLock, ensureDir } from "./mutate";
+import { acquireLock, ensureDir, sha256Buffer, sha256File } from "./mutate";
 import { createRun as createRunStore, listRuns, readActions } from "./run-store";
 import { detectAll } from "./detectors";
 import { applyFixes, gcRuns } from "./fixers";
@@ -61,13 +61,23 @@ export async function runDoctor(options: DoctorOptions): Promise<number> {
 			console.error("gc requires --before <date> and --yes");
 			return 64;
 		}
-		const res = gcRuns(options.gcBefore, options.gcYes);
-		if (res.refused) {
-			console.error("gc refused: missing or invalid args");
-			return 64;
+		ensureDir(resolve(process.cwd(), ".doctor"));
+		const gcLock = await acquireLock(LOCK_PATH);
+		if (!gcLock) {
+			console.error("concurrency lost: another doctor --fix is running");
+			return 5;
 		}
-		printJson({ removed: res.removed });
-		return 0;
+		try {
+			const res = gcRuns(options.gcBefore, options.gcYes, options.dryRun);
+			if (res.refused) {
+				console.error("gc refused: missing or invalid args");
+				return 64;
+			}
+			printJson(options.dryRun ? { wouldRemove: res.removed } : { removed: res.removed });
+			return 0;
+		} finally {
+			await gcLock.release();
+		}
 	}
 	// undo
 	if (options.mode === "undo") {
@@ -84,17 +94,33 @@ export async function runDoctor(options: DoctorOptions): Promise<number> {
 			return 66;
 		}
 		const actions = (await readActions(runDir)).reverse();
-		// restore each
+		// restore each target that still holds exactly what the fix wrote
+		let refused = 0;
 		for (const a of actions) {
 			const p = String(a.path);
 			const backupRel = p.startsWith(process.cwd()) ? p.slice(process.cwd().length + 1) : p;
 			const backupPath = resolve(runDir, "backups", backupRel);
-			if (await Bun.file(backupPath).exists()) {
-				const { copyFileSync } = await import("node:fs");
-				copyFileSync(backupPath, p);
+			if (!(await Bun.file(backupPath).exists())) continue;
+			const current = (await Bun.file(p).exists())
+				? await sha256File(p)
+				: sha256Buffer(Buffer.from(""));
+			if (current === a.beforeHash) continue; // fix never landed, or already undone
+			if (current !== a.afterHash) {
+				console.error(`refused: ${p} changed after the fix; left as is`);
+				refused += 1;
+				continue;
 			}
+			if (options.dryRun) {
+				console.log(`would restore ${p}`);
+				continue;
+			}
+			const { copyFileSync } = await import("node:fs");
+			copyFileSync(backupPath, p);
 		}
-		console.log(`undone run ${runId}`);
+		if (refused > 0) return 4;
+		console.log(
+			options.dryRun ? `dry-run: nothing restored for run ${runId}` : `undone run ${runId}`,
+		);
 		return 0;
 	}
 	// robot-triage mega-command
