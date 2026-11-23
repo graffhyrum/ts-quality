@@ -8,6 +8,12 @@
 - README: overhaul for first-screen clarity and leaner structure; address CodeRabbit review findings. See commits ab66c7f, bc192fe.
 - Docs: de-slopify README and AGENTS prose; add GitHub OG share image (1280x640); de-slopify src comments.
 
+## 0.5.0
+
+### Minor Changes
+
+- ed2611e: Add `stepdown-rule doctor`: diagnoses the install and local state. `--fix` applies the repairs and records each run under `.doctor/`.
+
 ## 0.4.7
 
 ### Patch Changes
