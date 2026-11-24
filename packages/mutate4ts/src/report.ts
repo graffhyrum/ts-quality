@@ -2,7 +2,18 @@ import type { MutationResult, MutationOutcome } from "./execute.ts";
 
 function formatReport(results: readonly MutationResult[]): string {
   const lines = results.map(formatResult);
-  return [...lines, "", formatSummary(results)].join("\n");
+  return [...lines, ...formatErrorMessages(results), "", formatSummary(results)].join("\n");
+}
+
+function formatErrorMessages(results: readonly MutationResult[]): string[] {
+  const counts = new Map<string, number>();
+  for (const { outcome } of results) {
+    if (outcome.status === "error")
+      counts.set(outcome.message, (counts.get(outcome.message) ?? 0) + 1);
+  }
+  if (counts.size === 0) return [];
+  const entries = [...counts].map(([message, n]) => `    ${message} (${n}x)`);
+  return ["", "  Error messages:", ...entries];
 }
 
 function formatResult(result: MutationResult): string {
