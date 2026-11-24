@@ -45,7 +45,7 @@
 
 ### Configuration
 
-- Use `arkenv` from [`config.ts`](./config.ts) for environment variables - NEVER remove arkenv
+- Use `@arkenv/core` from [`config.ts`](./config.ts) for environment variables - NEVER remove arkenv
 - Import: `import { CONFIG, type Config } from './config'`
 - Access env: `CONFIG.isDevelopment`, `CONFIG.isProduction`, `CONFIG.nodeEnv`
 - All env vars must be validated through arkenv
