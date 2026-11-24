@@ -31,7 +31,7 @@
     },
     "packages/mutate4ts": {
       "name": "mutate4ts",
-      "version": "2.0.0",
+      "version": "2.0.1",
       "bin": {
         "mutate4ts": "src/index.ts",
       },
@@ -104,7 +104,7 @@
     },
     "templates/ts-template": {
       "name": "ts-template",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "dependencies": {
         "@arkenv/core": "^1.0.0-rc.4",
         "arktype": "^2.2.10",
