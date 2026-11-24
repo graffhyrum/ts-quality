@@ -1,11 +1,12 @@
 {
+  "$schema": "https://json.schemastore.org/package.json",
   "name": "ts-template",
   "version": "0.3.0",
   "description": "Personal TypeScript project template with a quiet quality gate.",
   "module": "src/index.ts",
   "type": "module",
   "private": true,
-  "packageManager": "bun@1.4.4",
+  "packageManager": "bun@1.4.5",
   "scripts": {
     "dev": "bun --watch src/index.ts",
     "build": "bun build src/index.ts --target bun --outdir ./dist",
@@ -15,8 +16,8 @@
     "typecheck": "bun check",
     "fmt": "bun fmt --no-script",
     "fmt:check": "bun fmt --no-script --check",
-    "lint": "oxlint --type-aware",
-    "lint:fix": "oxlint --fix --type-aware",
+    "lint": "bun lint --type-aware",
+    "lint:fix": "bun lint --fix --type-aware",
     "rule-validator": "rule-validator",
     "stepdown": "stepdown-rule \"src/**/*.ts\" \"scripts/**/*.ts\" \"config.ts\"",
     "crap4ts": "bun scripts/crap-gate.ts",
@@ -27,15 +28,14 @@
     "mutate4ts:scan": "mutate4ts --scan src/store.ts"
   },
   "dependencies": {
-    "arkenv": "^0.8.1",
-    "arktype": "^2.2.9"
+    "arktype": "^2.2.10",
+    "@arkenv/core": "^1.0.0-rc.4"
   },
   "devDependencies": {
     "@changesets/cli": "^3.0.3",
     "@total-typescript/ts-reset": "^0.6.1",
-    "@types/bun": "^1.4.4",
-    "oxlint": "^1.90.0",
-    "oxlint-tsgolint": "^7.0.2005",
+    "@types/bun": "^1.4.5",
+    "oxlint": "^1.95.0",
     "@graffhyrum/crap4ts": "workspace:*",
     "mutate4ts": "workspace:*",
     "@graff/rule-validator": "workspace:*",

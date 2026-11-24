@@ -1,7 +1,7 @@
 // ⚠️ CRITICAL: DO NOT REMOVE ARKENV - This file MUST use arkenv for environment variable handling
 // ⚠️ If you remove arkenv, the application will fail to start properly
 // ⚠️ arkenv provides type-safe environment variable parsing with validation
-import arkenv from "arkenv";
+import arkenv from "@arkenv/core";
 
 const env = arkenv({
   NODE_ENV: "'development' | 'production' | 'test' = 'development'",
