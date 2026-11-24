@@ -1,5 +1,11 @@
 # @graff/rule-validator
 
+## 1.3.0
+
+### Minor Changes
+
+- ed2611e: Add `rule-validator doctor`: read-only self-diagnosis of the config, the rule registry, and the rule engine. `--fix` applies reversible repairs and records each run under `.doctor/`.
+
 ## 1.2.1
 
 ### Patch Changes
