@@ -10,6 +10,7 @@ import { executeMutations } from "./execute.ts";
 import type { MutationResult } from "./execute.ts";
 import type { FileError } from "./file-ops.ts";
 import { formatReport } from "./report.ts";
+import { computeTimeoutMs } from "./timeout.ts";
 import { exitCodeFor, fatalOutcome } from "./exit-code.ts";
 import type { MutationSite } from "./mutations/registry.ts";
 
@@ -72,7 +73,7 @@ function runMutations(
   command: readonly string[],
   baselineDurationMs: number,
 ): Effect.Effect<void, FileError> {
-  const timeoutMs = Math.max(baselineDurationMs * opts.timeoutFactor, 5000);
+  const timeoutMs = computeTimeoutMs(baselineDurationMs, opts.timeoutFactor);
   return executeMutations({
     sites,
     filePath: opts.sourceFile,
