@@ -1,0 +1,14 @@
+#!/bin/sh
+set -eu
+
+# Format staged source files and re-stage them. Formatting is never a separate
+# step a human or agent has to remember.
+staged_source_files() {
+  git diff --cached --name-only --diff-filter=ACM -z -- \
+    '*.ts' '*.tsx' '*.js' '*.jsx' '*.json' '*.md' '*.css' '*.html'
+}
+
+staged_source_files | xargs -0 -r bun fmt --no-script --
+staged_source_files | xargs -0 -r git add --
+
+bun run ratchet:check

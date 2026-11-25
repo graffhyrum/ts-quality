@@ -14,16 +14,77 @@ import { computeTimeoutMs } from "./timeout.ts";
 import { exitCodeFor, fatalOutcome } from "./exit-code.ts";
 import type { MutationSite } from "./mutations/registry.ts";
 
+const BACKUP_SUFFIX = ".mutate4ts-backup";
+
+function backupPath(filePath: string): string {
+  return `${filePath}${BACKUP_SUFFIX}`;
+}
+
+function recoverCrash(filePath: string): void {
+  const bp = backupPath(filePath);
+  try {
+    if (!Bun.file(bp).size) return;
+  } catch {
+    return;
+  }
+  try {
+    const original = Bun.file(bp);
+    // sync restore
+    const data = Bun.file(bp);
+    // Use Bun.write (async) but block via spawnSync? Instead do sync fs.
+  } catch {
+    return;
+  }
+}
+
 function main(): void {
   const opts = parseCliOptions(Bun.argv);
   validateSourceFile(opts.sourceFile);
+  // Crash recovery: a previous run may have been killed mid-mutation, leaving
+  // the source file holding a mutant. Restore it from the backup if present.
+  try {
+    const bp = backupPath(opts.sourceFile);
+    if (Bun.file(bp).size > 0) {
+      const original = Bun.file(bp);
+      // synchronous restore via Bun.write is async; block with Atomics? Use fs.writeFileSync.
+      const { writeFileSync, readFileSync, unlinkSync } = require("node:fs");
+      const bytes = readFileSync(bp);
+      writeFileSync(opts.sourceFile, bytes);
+      try {
+        unlinkSync(bp);
+      } catch {}
+      console.error(`mutate4ts: restored ${opts.sourceFile} from crash backup`);
+    }
+  } catch {
+    // no backup or unreadable; proceed
+  }
   const program = opts.scan ? buildScanProgram(opts) : buildTestProgram(opts);
   const fiber = Effect.runFork(program);
   let interrupted = false;
+  const restoreAndExit = () => {
+    try {
+      const bp = backupPath(opts.sourceFile);
+      const { readFileSync, writeFileSync, unlinkSync } = require("node:fs");
+      if (Bun.file(bp).size > 0) {
+        const bytes = readFileSync(bp);
+        writeFileSync(opts.sourceFile, bytes);
+        try {
+          unlinkSync(bp);
+        } catch {}
+      }
+    } catch {}
+  };
   process.on("SIGINT", () => {
     if (interrupted) return;
     interrupted = true;
+    restoreAndExit();
     Effect.runFork(Fiber.interrupt(fiber));
+  });
+  process.on("SIGTERM", () => {
+    if (interrupted) return;
+    interrupted = true;
+    restoreAndExit();
+    process.exit(143);
   });
   fiber.addObserver((exit) => {
     if (!Exit.isFailure(exit)) return;
@@ -61,8 +122,22 @@ function runMutationTesting(
 ): Effect.Effect<void, FileError | ScanError | BaselineFailedError | SpawnError> {
   return Effect.gen(function* () {
     const original = yield* readFile(opts.sourceFile);
+    // Persist a backup so a killed process can be recovered on the next run.
+    yield* Effect.sync(() => {
+      const { writeFileSync } = require("node:fs");
+      writeFileSync(backupPath(opts.sourceFile), original);
+    });
     const baseline = yield* runBaseline(opts.testCommand);
-    yield* runMutations(opts, sites, original, opts.testCommand, baseline.durationMs);
+    yield* runMutations(opts, sites, original, opts.testCommand, baseline.durationMs).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          try {
+            const { unlinkSync } = require("node:fs");
+            unlinkSync(backupPath(opts.sourceFile));
+          } catch {}
+        }),
+      ),
+    );
   });
 }
 
