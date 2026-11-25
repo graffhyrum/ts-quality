@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "deslop-please-ts",
+  "version": "0.3.0",
+  "description": "An opinionated TypeScript architectural linter: deep modules, narrow interfaces.",
+  "module": "src/cli.ts",
+  "type": "module",
+  "bin": {
+    "deslop-please-ts": "bin/deslop.ts"
+  },
+  "private": true,
+  "packageManager": "bun@1.4.5",
+  "scripts": {
+    "deslop": "bun bin/deslop.ts",
+    "dev": "bun --watch bin/deslop.ts",
+    "build": "bun build bin/deslop.ts --target node --outdir ./dist",
+    "start": "bun bin/deslop.ts",
+    "test": "bun test",
+    "test:coverage": "bun scripts/coverage-threshold.ts",
+    "typecheck": "bun check",
+    "fmt": "bun fmt --no-script",
+    "fmt:check": "bun fmt --no-script --check",
+    "lint": "oxlint --type-aware",
+    "lint:fix": "oxlint --fix --type-aware",
+    "rule-validator": "rule-validator",
+    "stepdown": "stepdown-rule \"src/**/*.ts\" \"scripts/**/*.ts\" \"config.ts\"",
+    "crap4ts": "bun scripts/crap-gate.ts",
+    "vet": "bun scripts/vet.ts",
+    "vet2": "bun fmt && bun check && bun lint && bun test:coverage",
+    "ratchet": "bun scripts/ratchet.ts",
+    "ratchet:check": "bun scripts/ratchet.ts --check",
+    "ratchet:init": "bun scripts/ratchet.ts --init",
+    "version-packages": "changeset version",
+    "release": "changeset publish",
+    "mutate4ts": "mutate4ts src/packages/todo-app/lib/store.ts",
+    "mutate4ts:scan": "mutate4ts --scan src/packages/todo-app/lib/store.ts",
+    "lint:boundaries": "depcruise src/packages"
+  },
+  "dependencies": {
+    "arktype": "^2.2.10",
+    "@arkenv/core": "^1.0.0-rc.4",
+    "typescript": "^6.0.2"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^3.0.3",
+    "@graff/rule-validator": "workspace:*",
+    "@graffhyrum/crap4ts": "workspace:*",
+    "@interfere/landmines": "^0.3.1",
+    "@stepdown/analyzer": "workspace:*",
+    "@total-typescript/ts-reset": "^0.6.1",
+    "@types/bun": "^1.4.5",
+    "dependency-cruiser": "^18.9.0",
+    "mutate4ts": "workspace:*",
+    "oxlint": "^1.95.0",
+    "oxlint-tsgolint": "^7.0.2008"
+  }
+}

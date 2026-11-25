@@ -1,0 +1,10 @@
+[test]
+coverageSkipTestFiles = true
+coveragePathIgnorePatterns = [
+  "**/*.test.ts",
+  "src/client.ts",
+  "**/*.spec.ts",
+  "scripts/**",
+  "node_modules/**",
+  "dist/**",
+]
