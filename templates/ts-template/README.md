@@ -9,7 +9,7 @@ bun install
 bun run vet
 ```
 
-Use [Bun](https://bun.sh) `1.4.4`. `packageManager` is `bun@1.4.4`.
+Use [Bun](https://bun.sh) `1.4.5`. `packageManager` is `bun@1.4.5`.
 
 ## Quality gate
 
@@ -90,11 +90,11 @@ bun run release
 
 ## Stack
 
-- Bun `1.4.4` for the runtime, test runner, `bun check`, and `bun fmt`
+- Bun `1.4.5` for the runtime, test runner, `bun check`, and `bun fmt`
 - oxlint type-aware for lint (`oxlint-tsgolint`)
-- `rule-validator` `v1.2.0`
-- `stepdown-rule` `v0.4.5`
-- `crap4ts` `v2.1.3`
-- `mutate4ts` `v1.0.0`
+- `rule-validator` `v1.2.1`
+- `stepdown-rule` `v0.4.7`
+- `crap4ts` `v2.1.4`
+- `mutate4ts` `v1.0.1`
 - ArkType and arkenv
 - Changesets
