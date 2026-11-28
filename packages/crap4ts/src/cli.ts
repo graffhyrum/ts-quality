@@ -1,12 +1,21 @@
 import { parseArgs } from "node:util";
-import type { Config } from "./types";
+import { DEFAULT_BASELINE_PATH } from "./file-contract/baseline";
+import { normalizeBaselineKey, UsageError } from "./file-contract/path-key";
+import { readPathLines, readRenamePairs } from "./file-contract/read-inputs";
+import type { Config, FileTargeting } from "./types";
 import { CrapError } from "./types";
 
-export function parseCli(argv: string[]): Config {
+export async function parseCli(argv: string[]): Promise<Config> {
   const { values, positionals } = parseArgv(argv);
   if (values.help) return printHelpAndExit();
   if (values.version) return printVersionAndExit();
-  return buildConfig(values, positionals);
+  assertNoContractOnInit(values);
+  assertReportOutputConflict(values);
+  assertBothStdin(values);
+  assertSeedConflicts(values, positionals);
+  assertUpdateWithoutBaseline(values);
+  const targeting = await buildTargeting(values, positionals);
+  return buildConfig(values, positionals, targeting);
 }
 
 function parseArgv(argv: string[]) {
@@ -29,6 +38,13 @@ function parseArgv(argv: string[]) {
       quiet: { type: "boolean", short: "q" },
       help: { type: "boolean", short: "h" },
       version: { type: "boolean" },
+      files: { type: "string", multiple: true },
+      "files-from": { type: "string" },
+      "renames-from": { type: "string" },
+      report: { type: "string" },
+      baseline: { type: "string" },
+      "update-baseline": { type: "boolean" },
+      seed: { type: "boolean" },
     },
     allowPositionals: true,
   });
@@ -36,7 +52,15 @@ function parseArgv(argv: string[]) {
 
 type ParsedValues = ReturnType<typeof parseArgv>["values"];
 
-function buildConfig(values: ParsedValues, positionals: string[]): Config {
+function buildConfig(
+  values: ParsedValues,
+  positionals: string[],
+  targeting: FileTargeting,
+): Config {
+  const report = asStringOrUndef(values.report);
+  if (report && report !== "json") {
+    throw new CrapError(`Invalid report: ${report}. Must be: json`);
+  }
   return {
     coveragePath: asString(values.coverage, "./coverage/coverage-final.json"),
     format: validateEnum(values.format, ["istanbul", "lcov", "v8"] as const, "format"),
@@ -55,7 +79,76 @@ function buildConfig(values: ParsedValues, positionals: string[]): Config {
     init: values.init === true,
     skipGitignore: values["no-gitignore"] === true,
     quiet: values.quiet === true,
+    reportJson: report === "json",
+    baselinePath: asString(values.baseline, DEFAULT_BASELINE_PATH),
+    updateBaseline: values["update-baseline"] === true,
+    seed: values.seed === true,
+    targeting,
   };
+}
+
+async function buildTargeting(values: ParsedValues, positionals: string[]): Promise<FileTargeting> {
+  const filesFlags = [...(values.files ?? [])].map((f) => normalizeBaselineKey(f));
+  const filesFrom = asStringOrUndef(values["files-from"]);
+  const filesFromPaths = filesFrom ? await readPathLines(filesFrom, "--files-from") : [];
+  const renamesFrom = asStringOrUndef(values["renames-from"]);
+  const renamePairs = renamesFrom ? await readRenamePairs(renamesFrom, "--renames-from") : [];
+  return {
+    filesFlags,
+    filesFromPaths,
+    filesFromPresent: filesFrom !== undefined,
+    filesFromEmpty: filesFromPresentIsEmpty(filesFrom, filesFromPaths),
+    legacyFiles: positionals,
+    legacyPresent: positionals.length > 0,
+    renamesFrom,
+    renamePairs,
+  };
+}
+
+function filesFromPresentIsEmpty(filesFrom: string | undefined, paths: string[]): boolean {
+  if (filesFrom === undefined) return false;
+  if (filesFrom !== "-") return paths.length === 0;
+  return paths.length === 0;
+}
+
+function assertNoContractOnInit(values: ParsedValues): void {
+  if (!values.init) return;
+  const contract =
+    values.files?.length ||
+    values["files-from"] ||
+    values["renames-from"] ||
+    values.report ||
+    values.baseline ||
+    values["update-baseline"] ||
+    values.seed;
+  if (contract) throw new CrapError("file-list flags cannot be used with --init");
+}
+
+function assertReportOutputConflict(values: ParsedValues): void {
+  if (values.report === "json" && values.output === "json") {
+    throw new CrapError("Cannot use --report json with -o json");
+  }
+}
+
+function assertBothStdin(values: ParsedValues): void {
+  if (values["files-from"] === "-" && values["renames-from"] === "-") {
+    throw new CrapError("Cannot read --files-from and --renames-from from stdin at once");
+  }
+}
+
+function assertSeedConflicts(values: ParsedValues, positionals: string[]): void {
+  if (!values.seed) return;
+  const hasList =
+    (values.files?.length ?? 0) > 0 || values["files-from"] !== undefined || positionals.length > 0;
+  if (hasList) throw new CrapError("--seed requires a full scan with no file list");
+  if (values["update-baseline"])
+    throw new CrapError("Cannot combine --seed with --update-baseline");
+}
+
+function assertUpdateWithoutBaseline(values: ParsedValues): void {
+  if (values["update-baseline"] && values.seed) {
+    throw new CrapError("Cannot combine --seed with --update-baseline");
+  }
 }
 
 function validateEnum<T extends string>(
@@ -102,6 +195,13 @@ Options:
       --only-crappy             (deprecated) Now the default behavior
       --include <glob>          Source file glob (default: **/*.{ts,tsx,js,jsx})
       --exclude <glob>          Exclusion glob (default: **/node_modules/**)
+      --files <path>            Repeatable path to analyze (literal, not glob-expanded)
+      --files-from <path>       Path list file, or - for stdin
+      --renames-from <path>     Rename map file (from<TAB>to lines), or - for stdin
+      --report json             Emit the shared quality-report JSON on stdout
+      --baseline <path>         Baseline file (default: .quality/crap4ts-baseline.json)
+      --update-baseline         Shrink baseline counts for selected files after a pass
+      --seed                    Write a new baseline from a full scan (counts > 0 only)
       --no-gitignore            Do not exclude gitignored files
   -q, --quiet                   Suppress output on success
       --init                    Detect test runner and configure coverage output
@@ -114,4 +214,8 @@ function printVersionAndExit(): never {
   const pkg = require("../package.json") as { version: string };
   console.log(pkg.version);
   process.exit(0);
+}
+
+export function isUsageError(error: unknown): error is UsageError {
+  return error instanceof UsageError;
 }

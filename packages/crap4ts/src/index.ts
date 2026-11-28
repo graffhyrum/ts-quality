@@ -1,14 +1,18 @@
 #!/usr/bin/env bun
-import { parseCli } from "./cli";
+import { isUsageError, parseCli } from "./cli";
 import { runInit } from "./detect/init";
 import { runPipeline } from "./pipeline";
 import { CrapError } from "./types";
 
 export async function runCli(argv: string[]): Promise<number> {
   try {
-    const config = parseCli(argv);
+    const config = await parseCli(argv);
     return config.init ? await runInit(process.cwd()) : await runPipeline(config);
   } catch (error) {
+    if (isUsageError(error)) {
+      console.error(error.message);
+      return 2;
+    }
     if (error instanceof CrapError) {
       console.error(error.message);
       return error.exitCode;

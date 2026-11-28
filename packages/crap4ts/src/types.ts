@@ -37,6 +37,19 @@ export type OutputFormat = "table" | "json" | "html";
 
 export type SortField = "score" | "name" | "complexity" | "coverage";
 
+import type { RenamePair } from "./file-contract/types";
+
+export type FileTargeting = {
+  filesFlags: string[];
+  filesFromPaths: string[];
+  filesFromPresent: boolean;
+  filesFromEmpty: boolean;
+  legacyFiles: string[];
+  legacyPresent: boolean;
+  renamesFrom: string | undefined;
+  renamePairs: RenamePair[];
+};
+
 export type Config = {
   coveragePath: string;
   format: CoverageFormat | undefined;
@@ -53,6 +66,11 @@ export type Config = {
   init: boolean;
   skipGitignore: boolean;
   quiet: boolean;
+  reportJson: boolean;
+  baselinePath: string;
+  updateBaseline: boolean;
+  seed: boolean;
+  targeting: FileTargeting;
 };
 
 export class CrapError extends Error {

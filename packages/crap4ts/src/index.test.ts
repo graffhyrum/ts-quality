@@ -34,6 +34,15 @@ describe("runCli", () => {
     expect(stderr).toContain("Unknown option '--nope'");
   });
 
+  test("invalid explicit path returns 2", async () => {
+    const stderr = await captureError(async () => {
+      expect(await runCli(["bun", "crap4ts", "--files", "../outside.ts", "-c", "cov.json"])).toBe(
+        2,
+      );
+    });
+    expect(stderr).toContain("invalid path");
+  });
+
   test("a missing coverage file returns 2", async () => {
     const stderr = await captureError(async () => {
       expect(await runCli(["bun", "crap4ts", "-c", "coverage/does-not-exist.json"])).toBe(2);
