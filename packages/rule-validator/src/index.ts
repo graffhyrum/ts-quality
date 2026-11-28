@@ -1,6 +1,7 @@
 import { promises as fs } from "node:fs";
 import pc from "picocolors";
 import { isFileExcludedForRule, type ProjectConfig, type RuleExcludes } from "./config.ts";
+import { hasExplicitListExtension } from "./file-contract/extensions.ts";
 import { REGEX_SCAN_DEFAULT_EXCLUDES } from "./exclude-patterns.ts";
 import { type RelativePosixPath, toPosixPath, toRelativePosix } from "./paths.ts";
 import { RULES } from "./rules";
@@ -30,6 +31,36 @@ export function exitWithResult(
 	printRunFooter(outcome);
 	process.exit(outcomeExitCode(outcome));
 }
+export async function scanFilesList(
+	paths: readonly string[],
+	options?: ScanOptions,
+): Promise<ScanResult> {
+	const opts = applyScanDefaults(options);
+	let errorCount = 0;
+	let warningCount = 0;
+	let fileCount = 0;
+	const collected: JsonViolation[] = [];
+	const displayViolations: DisplayViolation[] = [];
+	for (const file of paths) {
+		if (!shouldProcessExplicitListFile(file, opts.excludeName)) continue;
+		fileCount++;
+		const violations: Violation[] = await scanFile(file, bunFileReader, opts.ruleExcludes);
+		if (violations.length === 0) continue;
+		const relFile = toRelativePosix(file);
+		collectViolations({ violations, relFile, collected, displayViolations, json: opts.json });
+		const counts = countSeverities(violations);
+		errorCount += counts.errors;
+		warningCount += counts.warnings;
+	}
+	return {
+		errorCount,
+		warningCount,
+		fileCount,
+		violations: opts.json ? collected : undefined,
+		displayViolations,
+	};
+}
+
 export async function scanFiles(
 	pattern: string,
 	options: ScanOptions & { json: true },
@@ -146,6 +177,11 @@ export function shouldProcessFile(file: string, excludeName?: string): boolean {
 		file.endsWith(".ts") || file.endsWith(".tsx") || file.endsWith(".js") || file.endsWith(".jsx");
 	const isNotSelf: boolean = excludeName ? !isSelfPath(file, excludeName) : true;
 	return isValidExtension && isNotSelf;
+}
+
+export function shouldProcessExplicitListFile(file: string, excludeName?: string): boolean {
+	const isNotSelf: boolean = excludeName ? !isSelfPath(file, excludeName) : true;
+	return hasExplicitListExtension(file) && isNotSelf;
 }
 function isSelfPath(file: string, excludeName: string): boolean {
 	const segments = toPosixPath(file).split("/");

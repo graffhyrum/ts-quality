@@ -1,10 +1,12 @@
+import path from "node:path";
 import type { ProjectConfig } from "./config.ts";
 import { AST_SCAN_DEFAULT_EXCLUDES } from "./exclude-patterns.ts";
 import type { DisplayViolation, JsonViolation, ScanResult } from "./index.ts";
+import { toRelativePosix } from "./paths.ts";
 import { AST_RULES } from "./rules/all-rules.ts";
 import type { RuleResult } from "./rules/runner.ts";
 import { runRules } from "./rules/runner.ts";
-import { createAnalyzer } from "./typescript/compiler.ts";
+import { createAnalyzer, defaultAnalyzerDeps } from "./typescript/compiler.ts";
 
 export type { JsonViolation } from "./index.ts";
 
@@ -21,6 +23,26 @@ export async function runAstRules(pattern: string, options?: AstScanOptions): Pr
 	const ruleExcludes = options?.config?.rules ?? {};
 	const analyzer = await createAnalyzer({ pattern, excludePatterns });
 	const results: RuleResult[] = runRules({ analyzer, rules: AST_RULES, ruleExcludes });
+	return toScanResult(results, options?.json);
+}
+
+export async function runAstRulesForFiles(
+	filePaths: readonly string[],
+	options?: AstScanOptions,
+): Promise<ScanResult> {
+	const ruleExcludes = options?.config?.rules ?? {};
+	const absolute = filePaths.map((f) => path.resolve(f));
+	const analyzer = await createAnalyzer(
+		{ pattern: "**", excludePatterns: [] },
+		{
+			listFiles: async () => absolute,
+			readFile: defaultAnalyzerDeps.readFile,
+		},
+	);
+	const results: RuleResult[] = runRules({ analyzer, rules: AST_RULES, ruleExcludes }).map((r) => ({
+		...r,
+		file: toRelativePosix(r.file),
+	}));
 	return toScanResult(results, options?.json);
 }
 

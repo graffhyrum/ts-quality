@@ -1,20 +1,20 @@
 import { afterAll, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 
-const scanFilesMock = mock();
+const runPerFileScanMock = mock();
 const exitWithResultMock = mock();
-const runAstRulesMock = mock();
 const printViolationsMock = mock((file: unknown) => {
 	console.log(file);
 });
 
+const realIndex = (await import("./index.ts?fresh" as never)) as typeof import("./index.ts");
 mock.module("./index.ts", () => ({
-	scanFiles: scanFilesMock,
+	...realIndex,
 	exitWithResult: exitWithResultMock,
 	printViolations: printViolationsMock,
 }));
 
-mock.module("./ast-scan.ts", () => ({
-	runAstRules: runAstRulesMock,
+mock.module("./file-contract/analyze.ts", () => ({
+	runPerFileScan: runPerFileScanMock,
 }));
 
 const realConfig = (await import("./config.ts?fresh" as never)) as typeof import("./config.ts");
@@ -29,35 +29,82 @@ const { main } = await import("./cli.ts");
 afterAll(() => mock.restore());
 
 beforeEach(() => {
-	scanFilesMock.mockClear();
+	runPerFileScanMock.mockClear();
 	exitWithResultMock.mockClear();
-	runAstRulesMock.mockClear();
 	printViolationsMock.mockClear();
-	runAstRulesMock.mockResolvedValue({ errorCount: 0, warningCount: 0 });
+	runPerFileScanMock.mockResolvedValue({
+		reportKeys: [],
+		errorCountByFile: new Map(),
+		warningCount: 0,
+		combined: { errorCount: 0, warningCount: 0, fileCount: 0, violations: [] },
+	});
+});
+
+function mockScan(combined: {
+	errorCount: number;
+	warningCount: number;
+	fileCount?: number;
+	violations?: unknown[];
+	displayViolations?: unknown[];
+}): void {
+	const violations = combined.violations ?? combined.displayViolations ?? [];
+	runPerFileScanMock.mockResolvedValue({
+		reportKeys: ["a.ts"],
+		errorCountByFile: new Map(combined.errorCount > 0 ? [["a.ts", combined.errorCount]] : []),
+		warningCount: combined.warningCount,
+		combined: {
+			errorCount: combined.errorCount,
+			warningCount: combined.warningCount,
+			fileCount: combined.fileCount ?? 0,
+			violations,
+		},
+	});
+}
+
+describe("deduplicateAndPrint", () => {
+	it("merges regex and AST output", async () => {
+		const { asRelativePosix } = await import("./paths.ts");
+		const { deduplicateAndPrint } = await import("./cli.ts?fresh" as never) as typeof import("./cli.ts");
+		const combined = deduplicateAndPrint(
+			{
+				errorCount: 1,
+				warningCount: 0,
+				displayViolations: [
+					{
+						file: asRelativePosix("a.ts"),
+						line: 1,
+						column: 1,
+						rule: { name: "r", message: "m", severity: "error" },
+						match: "x",
+					},
+				],
+			},
+			{ errorCount: 0, warningCount: 0, displayViolations: [] },
+			false,
+		);
+		expect(combined.errorCount).toBe(1);
+	});
 });
 
 describe("CLI main function", () => {
 	it("should use default pattern when no args and handle successful scan", async () => {
-		scanFilesMock.mockResolvedValue({ errorCount: 0, warningCount: 0 });
-
 		await main(["node", "cli.ts"]);
 
-		expect(scanFilesMock).toHaveBeenCalledWith("**/*.{ts,tsx,js,jsx}", { json: undefined, config: {} });
+		expect(runPerFileScanMock).toHaveBeenCalled();
 		expect(exitWithResultMock).toHaveBeenCalledWith(0, 0, 0);
 	});
 
 	it("should use provided pattern and handle successful scan with errors and warnings", async () => {
-		scanFilesMock.mockResolvedValue({ errorCount: 1, warningCount: 2 });
+		mockScan({ errorCount: 1, warningCount: 2 });
 
 		await main(["node", "cli.ts", "src/**/*.ts"]);
 
-		expect(scanFilesMock).toHaveBeenCalledWith("src/**/*.ts", { json: undefined, config: {} });
+		expect(runPerFileScanMock).toHaveBeenCalled();
 		expect(exitWithResultMock).toHaveBeenCalledWith(1, 2, 0);
 	});
 
 	it("should combine regex and AST rule results", async () => {
-		scanFilesMock.mockResolvedValue({ errorCount: 1, warningCount: 0, fileCount: 5 });
-		runAstRulesMock.mockResolvedValue({ errorCount: 2, warningCount: 3, fileCount: 3 });
+		mockScan({ errorCount: 3, warningCount: 3, fileCount: 8 });
 
 		await main(["node", "cli.ts"]);
 
@@ -65,18 +112,24 @@ describe("CLI main function", () => {
 	});
 
 	it("should print display violations via printDedupedDisplay when present", async () => {
-		scanFilesMock.mockResolvedValue({
-			errorCount: 1,
+		runPerFileScanMock.mockResolvedValue({
+			reportKeys: ["src/foo.ts"],
+			errorCountByFile: new Map([["src/foo.ts", 1]]),
 			warningCount: 0,
-			displayViolations: [
-				{
-					file: "src/foo.ts",
-					line: 10,
-					column: 5,
-					rule: { name: "test-rule", message: "test error", severity: "error" },
-					match: "badCode",
-				},
-			],
+			combined: {
+				errorCount: 1,
+				warningCount: 0,
+				fileCount: 0,
+				violations: [
+					{
+						file: "src/foo.ts",
+						line: 10,
+						column: 5,
+						rule: { name: "test-rule", message: "test error", severity: "error" },
+						match: "badCode",
+					},
+				],
+			},
 		});
 
 		const logSpy = spyOn(console, "log").mockImplementation(() => {});
@@ -95,7 +148,7 @@ describe("CLI main function", () => {
 
 	it("should handle error in scanFiles", async () => {
 		const error = new Error("scan failed");
-		scanFilesMock.mockRejectedValue(error);
+		runPerFileScanMock.mockRejectedValue(error);
 
 		const consoleMock = mock(() => {});
 		const originalError = console.error;
@@ -115,11 +168,10 @@ describe("CLI main function", () => {
 		}
 
 		try {
-			expect(consoleMock).toHaveBeenCalledWith("Error scanning files:", "scan failed");
+			expect(consoleMock).toHaveBeenCalledWith("rule-validator: scan failed");
 			expect(exitSpy).toHaveBeenCalledWith(1);
 			expect(exitWithResultMock).not.toHaveBeenCalled();
 			const stdout = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
-			expect(stdout).toContain("rule-validator");
 			expect(stdout).toContain("Run failed");
 			expect(stdout).not.toContain("\n\n\n");
 		} finally {
@@ -129,7 +181,6 @@ describe("CLI main function", () => {
 	});
 
 	it("human run stdout starts with framed header", async () => {
-		scanFilesMock.mockResolvedValue({ errorCount: 0, warningCount: 0 });
 		const logSpy = spyOn(console, "log").mockImplementation(() => {});
 
 		await main(["node", "cli.ts"]);
@@ -239,22 +290,27 @@ describe("CLI --help flag", () => {
 
 describe("CLI --json flag", () => {
 	it("--json should output JSON format", async () => {
-		scanFilesMock.mockResolvedValue({
-			errorCount: 1,
+		runPerFileScanMock.mockResolvedValue({
+			reportKeys: ["a.ts"],
+			errorCountByFile: new Map([["a.ts", 1]]),
 			warningCount: 0,
-			violations: [
-				{
-					file: "a.ts",
-					line: 1,
-					column: 1,
-					rule: "test",
-					message: "msg",
-					severity: "error",
-					match: "x",
-				},
-			],
+			combined: {
+				errorCount: 1,
+				warningCount: 0,
+				fileCount: 1,
+				violations: [
+					{
+						file: "a.ts",
+						line: 1,
+						column: 1,
+						rule: "test",
+						message: "msg",
+						severity: "error",
+						match: "x",
+					},
+				],
+			},
 		});
-		runAstRulesMock.mockResolvedValue({ errorCount: 0, warningCount: 0, violations: [] });
 
 		const captured: string[] = [];
 		const logMock = mock((...args: unknown[]) => {
@@ -287,15 +343,20 @@ describe("CLI --json flag", () => {
 
 describe("countFromJsonViolations path via deduplicateAndPrint", () => {
 	it("counts errors and warnings from json violations when no display violations are present", async () => {
-		scanFilesMock.mockResolvedValue({
-			errorCount: 0,
-			warningCount: 0,
-			violations: [
-				{ file: "a.ts", line: 1, column: 1, rule: "rule-a", message: "msg", severity: "error", match: "x" },
-				{ file: "a.ts", line: 2, column: 1, rule: "rule-b", message: "msg", severity: "warning", match: "y" },
-			],
+		runPerFileScanMock.mockResolvedValue({
+			reportKeys: ["a.ts"],
+			errorCountByFile: new Map([["a.ts", 1]]),
+			warningCount: 1,
+			combined: {
+				errorCount: 1,
+				warningCount: 1,
+				fileCount: 0,
+				violations: [
+					{ file: "a.ts", line: 1, column: 1, rule: "rule-a", message: "msg", severity: "error", match: "x" },
+					{ file: "a.ts", line: 2, column: 1, rule: "rule-b", message: "msg", severity: "warning", match: "y" },
+				],
+			},
 		});
-		runAstRulesMock.mockResolvedValue({ errorCount: 0, warningCount: 0, violations: [] });
 
 		await main(["node", "cli.ts"]);
 
@@ -303,15 +364,20 @@ describe("countFromJsonViolations path via deduplicateAndPrint", () => {
 	});
 
 	it("counts only errors from json violations with no display violations", async () => {
-		scanFilesMock.mockResolvedValue({
-			errorCount: 0,
+		runPerFileScanMock.mockResolvedValue({
+			reportKeys: ["b.ts"],
+			errorCountByFile: new Map([["b.ts", 2]]),
 			warningCount: 0,
-			violations: [
-				{ file: "b.ts", line: 5, column: 3, rule: "rule-c", message: "msg", severity: "error", match: "z" },
-				{ file: "b.ts", line: 6, column: 3, rule: "rule-d", message: "msg", severity: "error", match: "w" },
-			],
+			combined: {
+				errorCount: 2,
+				warningCount: 0,
+				fileCount: 0,
+				violations: [
+					{ file: "b.ts", line: 5, column: 3, rule: "rule-c", message: "msg", severity: "error", match: "z" },
+					{ file: "b.ts", line: 6, column: 3, rule: "rule-d", message: "msg", severity: "error", match: "w" },
+				],
+			},
 		});
-		runAstRulesMock.mockResolvedValue({ errorCount: 0, warningCount: 0, violations: [] });
 
 		await main(["node", "cli.ts"]);
 
@@ -321,10 +387,18 @@ describe("countFromJsonViolations path via deduplicateAndPrint", () => {
 
 describe("printDedupedDisplay sort comparator branches", () => {
 	it("sorts violations from different files alphabetically (a.file !== b.file branch)", async () => {
-		scanFilesMock.mockResolvedValue({
-			errorCount: 2,
+		runPerFileScanMock.mockResolvedValue({
+			reportKeys: ["a-first.ts", "z-last.ts"],
+			errorCountByFile: new Map([
+				["a-first.ts", 1],
+				["z-last.ts", 1],
+			]),
 			warningCount: 0,
-			displayViolations: [
+			combined: {
+				errorCount: 2,
+				warningCount: 0,
+				fileCount: 0,
+				violations: [
 				{
 					file: "z-last.ts",
 					line: 1,
@@ -339,9 +413,9 @@ describe("printDedupedDisplay sort comparator branches", () => {
 					rule: { name: "rule-b", message: "error", severity: "error" },
 					match: "y",
 				},
-			],
+				],
+			},
 		});
-		runAstRulesMock.mockResolvedValue({ errorCount: 0, warningCount: 0 });
 
 		const logSpy = spyOn(console, "log").mockImplementation(() => {});
 
@@ -358,10 +432,15 @@ describe("printDedupedDisplay sort comparator branches", () => {
 	});
 
 	it("sorts violations from the same file by line number (a.line !== b.line branch)", async () => {
-		scanFilesMock.mockResolvedValue({
-			errorCount: 2,
+		runPerFileScanMock.mockResolvedValue({
+			reportKeys: ["same.ts"],
+			errorCountByFile: new Map([["same.ts", 2]]),
 			warningCount: 0,
-			displayViolations: [
+			combined: {
+				errorCount: 2,
+				warningCount: 0,
+				fileCount: 0,
+				violations: [
 				{
 					file: "same.ts",
 					line: 20,
@@ -376,9 +455,9 @@ describe("printDedupedDisplay sort comparator branches", () => {
 					rule: { name: "rule-b", message: "error", severity: "error" },
 					match: "y",
 				},
-			],
+				],
+			},
 		});
-		runAstRulesMock.mockResolvedValue({ errorCount: 0, warningCount: 0 });
 
 		const logSpy = spyOn(console, "log").mockImplementation(() => {});
 
