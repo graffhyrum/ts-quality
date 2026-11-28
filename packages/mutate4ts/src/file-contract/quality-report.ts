@@ -62,17 +62,3 @@ export function baselineWouldFail(
   }
   return false;
 }
-
-export function newViolationsWouldIncreaseBaseline(
-  violationsByFile: Map<string, number>,
-  baseline: BaselineDocument | null,
-  selectedKeys: Iterable<string>,
-): boolean {
-  for (const key of selectedKeys) {
-    const violations = violationsByFile.get(key) ?? 0;
-    const allowed = allowedCount(baseline, key);
-    if (!(key in (baseline?.files ?? {})) && violations > 0) return true;
-    if (violations > allowed) return true;
-  }
-  return false;
-}

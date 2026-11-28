@@ -1,11 +1,7 @@
 import { test, expect, describe } from "bun:test";
 import { discoverFullScanKeys } from "./discovery.ts";
 import { hasExplicitListExtension, isExcludedFromDiscovery } from "./extensions.ts";
-import {
-  buildQualityReport,
-  baselineWouldFail,
-  newViolationsWouldIncreaseBaseline,
-} from "./quality-report.ts";
+import { buildQualityReport, baselineWouldFail } from "./quality-report.ts";
 import { buildScopedKeys, resolveSelectionMode } from "./selection.ts";
 import { formatQualityReportJson } from "./quality-report.ts";
 
@@ -56,9 +52,7 @@ describe("file-contract units", () => {
     const withoutBaseline = buildQualityReport(violations, null, 1);
     expect(withoutBaseline.exitCode).toBe(1);
     expect(baselineWouldFail(violations, null, ["src/a.ts"])).toBe(true);
-    expect(
-      newViolationsWouldIncreaseBaseline(violations, { version: 1, files: {} }, ["src/a.ts"]),
-    ).toBe(true);
+    expect(baselineWouldFail(violations, { version: 1, files: {} }, ["src/a.ts"])).toBe(true);
     const over = buildQualityReport(
       new Map([["src/a.ts", 3]]),
       { version: 1, files: { "src/a.ts": 1 } },
@@ -75,11 +69,9 @@ describe("file-contract units", () => {
     ).toBe(false);
     expect(formatQualityReportJson(over)).toContain("mutate4ts");
     expect(
-      newViolationsWouldIncreaseBaseline(
-        new Map([["src/a.ts", 0]]),
-        { version: 1, files: { "src/a.ts": 1 } },
-        ["src/a.ts"],
-      ),
+      baselineWouldFail(new Map([["src/a.ts", 0]]), { version: 1, files: { "src/a.ts": 1 } }, [
+        "src/a.ts",
+      ]),
     ).toBe(false);
     const failAndError = buildQualityReport(
       new Map([["src/a.ts", 2]]),

@@ -18,8 +18,6 @@ const score = await capture([
   "src/**/*.ts",
   "--exclude",
   "**/*.test.ts",
-  "--exclude",
-  "src/cli-run.ts",
   "--quiet",
 ]);
 if (score.exitCode !== 0) fail("score", score);

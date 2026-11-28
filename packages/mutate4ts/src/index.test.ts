@@ -1,7 +1,12 @@
 import { test, expect } from "bun:test";
-import { main } from "./cli-run.ts";
+import { join } from "node:path";
 
-test("entry module loads", () => {
-  expect(typeof main).toBe("function");
-  void import("./index.ts");
+test("index entry runs main for subprocess invocation", async () => {
+  const indexPath = join(import.meta.dir, "index.ts");
+  const proc = Bun.spawn(["bun", indexPath, "--help"], {
+    cwd: join(import.meta.dir, ".."),
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  expect(await proc.exited).toBe(0);
 });

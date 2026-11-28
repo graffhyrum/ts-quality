@@ -40,4 +40,11 @@ function count(results: readonly MutationResult[], status: MutationOutcome["stat
   return results.filter((r) => r.outcome.status === status).length;
 }
 
+export function indentTestOutput(text: string): string {
+  return text
+    .split("\n")
+    .map((line) => `    ${line}`)
+    .join("\n");
+}
+
 export { formatReport, formatSummary };

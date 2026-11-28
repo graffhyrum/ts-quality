@@ -3,7 +3,6 @@ import {
   baselineWouldFail,
   buildQualityReport,
   formatQualityReportJson,
-  newViolationsWouldIncreaseBaseline,
 } from "./quality-report.ts";
 
 describe("quality-report", () => {
@@ -25,11 +24,7 @@ describe("quality-report", () => {
       ),
     ).toBe(true);
     expect(
-      newViolationsWouldIncreaseBaseline(
-        new Map([["b.ts", 0]]),
-        { version: 1, files: { "b.ts": 0 } },
-        ["b.ts"],
-      ),
+      baselineWouldFail(new Map([["b.ts", 0]]), { version: 1, files: { "b.ts": 0 } }, ["b.ts"]),
     ).toBe(false);
     const multi = buildQualityReport(
       new Map([

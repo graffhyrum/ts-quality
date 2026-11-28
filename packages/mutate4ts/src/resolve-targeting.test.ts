@@ -91,6 +91,21 @@ describe("resolveFileSelection", () => {
     }
   });
 
+  test("--files-from file with only blank lines triggers full scan", async () => {
+    writeFileSync(join(dir, "blanks.txt"), "\n\n\r\n");
+    const cwd = process.cwd();
+    process.chdir(dir);
+    try {
+      const sel = await resolveFileSelection({
+        ...baseOpts(),
+        filesFrom: "blanks.txt",
+      });
+      expect(sel.mode).toBe("full");
+    } finally {
+      process.chdir(cwd);
+    }
+  });
+
   test("--files-from file and empty file triggers full scan", async () => {
     writeFileSync(join(dir, "list.txt"), "src/a.ts\n");
     writeFileSync(join(dir, "empty.txt"), "");

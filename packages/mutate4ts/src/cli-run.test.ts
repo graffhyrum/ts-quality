@@ -2,7 +2,7 @@ import { test, expect, describe, beforeAll, afterAll, spyOn } from "bun:test";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Effect } from "effect";
+import { Effect, Fiber } from "effect";
 import { FileError } from "./file-ops.ts";
 import * as cliRun from "./cli-run.ts";
 import {
@@ -14,9 +14,10 @@ import {
   runMain,
   runFromArgv,
   main,
+  registerMutationInterrupt,
 } from "./cli-run.ts";
 import type { ParsedCli } from "./cli.ts";
-import { createAggregatedRun, mergeResults } from "./mutation-count.ts";
+import { createAggregatedRun, mergeResults, recordFileResults } from "./mutation-count.ts";
 import { buildQualityReport } from "./file-contract/quality-report.ts";
 
 describe("cli-run helpers", () => {
@@ -180,6 +181,12 @@ describe("cli-run helpers", () => {
       rmSync(join(dir, ".quality/mutate4ts-baseline.json"));
       const agg = createAggregatedRun();
       agg.violationsByFile.set("a.ts", 1);
+      let written = "";
+      const original = process.stdout.write;
+      process.stdout.write = ((chunk: string) => {
+        written += chunk;
+        return true;
+      }) as never;
       try {
         const result = await finalizeRun(
           {
@@ -195,9 +202,53 @@ describe("cli-run helpers", () => {
         );
         expect(result.exitCode).toBe(0);
         expect(readFileSync(".quality/mutate4ts-baseline.json", "utf8")).toContain('"a.ts": 1');
+        const report = JSON.parse(written) as {
+          ok: boolean;
+          exitCode: number;
+          files: { status: string; baseline: number }[];
+        };
+        expect(report.ok).toBe(true);
+        expect(report.exitCode).toBe(0);
+        expect(report.files[0]?.status).toBe("ok");
+        expect(report.files[0]?.baseline).toBe(1);
       } finally {
+        process.stdout.write = original;
         process.chdir(cwd);
       }
+    });
+
+    test("seed exits 3 when mutants errored", async () => {
+      const agg = createAggregatedRun();
+      recordFileResults(agg, "a.ts", [
+        {
+          site: {
+            filePath: "a.ts",
+            line: 1,
+            column: 1,
+            description: "d",
+            originalText: "t",
+            mutatedText: "f",
+            span: { start: 0, end: 1 },
+            category: { kind: "literal", from: "true", to: "false" },
+          },
+          outcome: { status: "error", message: "e" },
+          durationMs: 1,
+          testOutput: "",
+        },
+      ]);
+      const result = await finalizeRun(
+        {
+          report: "json",
+          seed: true,
+          updateBaseline: false,
+          baselinePath: ".quality/mutate4ts-baseline.json",
+        } as ParsedCli,
+        null,
+        true,
+        agg,
+        ["a.ts"],
+      );
+      expect(result.exitCode).toBe(3);
     });
 
     test("shrinks baseline on update", async () => {
@@ -234,7 +285,15 @@ describe("cli-run helpers", () => {
     }) as never);
     const error = spyOn(console, "error").mockImplementation(() => {});
     await expect(
-      runFromArgv(["bun", "mutate4ts", "--update-baseline", "--report", "json"]),
+      runFromArgv([
+        "bun",
+        "mutate4ts",
+        "--update-baseline",
+        "--report",
+        "json",
+        "--baseline",
+        ".quality/does-not-exist-baseline.json",
+      ]),
     ).rejects.toThrow("exit");
     expect(code).toBe(2);
     exit.mockRestore();
@@ -547,6 +606,14 @@ describe("cli-run helpers", () => {
       exit.mockRestore();
       err.mockRestore();
     }
+  });
+
+  test("registerMutationInterrupt ignores duplicate SIGINT", () => {
+    const fiber = Effect.runFork(Effect.never);
+    registerMutationInterrupt(fiber);
+    process.emit("SIGINT");
+    process.emit("SIGINT");
+    Effect.runFork(Fiber.interrupt(fiber));
   });
 
   test("runScanMode handles empty target list", async () => {

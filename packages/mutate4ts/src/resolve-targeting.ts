@@ -23,9 +23,8 @@ export async function resolveFileSelection(
       filesFromEmpty = fromFile.length === 0;
       literal.push(...fromFile);
     } else {
-      const rawText = await Bun.file(opts.filesFrom).text();
-      filesFromEmpty = rawText.length === 0;
       const fromFile = await readPathLines(opts.filesFrom, "--files-from");
+      filesFromEmpty = fromFile.length === 0;
       literal.push(...fromFile);
     }
   }

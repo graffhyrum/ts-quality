@@ -4,9 +4,4 @@ coverageSkipTestFiles = true
 # Only vet-stop.ts (process I/O: stdin, spawn, exit) is ignored; test/vet-stop.test.ts
 # tests it by spawning the hook, which bun coverage does not count. The pure logic
 # in vet-stop-lib.ts is counted.
-coveragePathIgnorePatterns = [
-  ".cursor/hooks/vet-stop.ts",
-  # Process entry and CLI orchestration (src/cli-run.test.ts + test/file-contract.test.ts).
-  "src/index.ts",
-  "src/cli-run.ts",
-]
+coveragePathIgnorePatterns = [".cursor/hooks/vet-stop.ts"]

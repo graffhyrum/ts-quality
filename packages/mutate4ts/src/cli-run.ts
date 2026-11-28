@@ -23,7 +23,6 @@ import {
   baselineWouldFail,
   buildQualityReport,
   formatQualityReportJson,
-  newViolationsWouldIncreaseBaseline,
 } from "./file-contract/quality-report.ts";
 import { resolveFileSelection } from "./resolve-targeting.ts";
 import { scanFile, readFile } from "./scan.ts";
@@ -33,7 +32,7 @@ import type { BaselineFailedError, SpawnError } from "./baseline.ts";
 import { executeMutations } from "./execute.ts";
 import type { MutationResult } from "./execute.ts";
 import type { FileError } from "./file-ops.ts";
-import { formatReport } from "./report.ts";
+import { formatReport, indentTestOutput } from "./report.ts";
 import { computeTimeoutMs } from "./timeout.ts";
 import { fatalOutcome } from "./exit-code.ts";
 import type { MutationSite } from "./mutations/registry.ts";
@@ -68,15 +67,16 @@ async function runParsed(opts: ParsedCli): Promise<void> {
 }
 
 export async function runMain(opts: ParsedCli): Promise<void> {
+  let baseline = await readBaselineFile(opts.baselinePath);
+  if (opts.seed) await assertBaselineAbsent(opts.baselinePath);
+  if (opts.updateBaseline) assertBaselinePresent(baseline);
+
   const selection = await resolveFileSelection(opts);
   const renamePairs =
     opts.renamesFrom !== undefined ? await readRenamePairs(opts.renamesFrom, "--renames-from") : [];
-  let baseline = await readBaselineFile(opts.baselinePath);
   if (baseline && renamePairs.length > 0) {
     baseline = await applyRenamesInMemory(baseline, renamePairs);
   }
-  if (opts.seed) await assertBaselineAbsent(opts.baselinePath);
-  if (opts.updateBaseline) assertBaselinePresent(baseline);
 
   if (opts.scan) {
     await runScanMode(opts, selection.targetKeys);
@@ -85,14 +85,9 @@ export async function runMain(opts: ParsedCli): Promise<void> {
 
   const program = buildMultiFileProgram(opts, selection.targetKeys);
   const fiber = Effect.runFork(program);
-  let interrupted = false;
-  process.on("SIGINT", () => {
-    if (interrupted) return;
-    interrupted = true;
-    Effect.runFork(Fiber.interrupt(fiber));
-  });
+  registerMutationInterrupt(fiber);
 
-  const exit = await new Promise<Exit.Exit<void, unknown>>((resolve) => {
+  const exit = await new Promise<Exit.Exit<AggregatedRun, unknown>>((resolve) => {
     fiber.addObserver((value) => resolve(value));
   });
 
@@ -103,31 +98,31 @@ export async function runMain(opts: ParsedCli): Promise<void> {
     return;
   }
 
-  await finishAfterMutations(opts, baseline, selection.mode === "full");
+  await finishAfterMutations(
+    opts,
+    baseline,
+    selection.mode === "full",
+    exit.value,
+    selection.targetKeys,
+  );
 }
-
-// Mutation run stores aggregate on a module-level slot set by the Effect program.
-let lastAggregatedRun: AggregatedRun | null = null;
-let lastTargetKeys: string[] = [];
 
 export function buildMultiFileProgram(
   opts: ParsedCli,
   targetKeys: string[],
-): Effect.Effect<void, FileError | ScanError | BaselineFailedError | SpawnError> {
-  lastTargetKeys = targetKeys;
+): Effect.Effect<AggregatedRun, FileError | ScanError | BaselineFailedError | SpawnError> {
   return Effect.gen(function* () {
     const agg = createAggregatedRun();
     if (targetKeys.length === 0) {
-      lastAggregatedRun = agg;
-      return;
+      return agg;
     }
     const baselineDurationMs = yield* runBaseline(opts.testCommand).pipe(
       Effect.map((r) => r.durationMs),
     );
     for (const key of targetKeys) {
-      yield* mutateOneFile(opts, key, baselineDurationMs, agg);
+      yield* mutateOneFile(opts, key, baselineDurationMs, agg, targetKeys.length === 1);
     }
-    lastAggregatedRun = agg;
+    return agg;
   });
 }
 
@@ -136,6 +131,7 @@ function mutateOneFile(
   filePath: string,
   baselineDurationMs: number,
   agg: AggregatedRun,
+  singleTarget: boolean,
 ): Effect.Effect<void, FileError | ScanError> {
   return Effect.gen(function* () {
     const sites = yield* scanFile(filePath, opts.lines);
@@ -156,7 +152,6 @@ function mutateOneFile(
       onProgress,
     });
     recordFileResults(agg, filePath, results);
-    const singleTarget = lastTargetKeys.length === 1;
     if (opts.report === "human" && (opts.verbose || singleTarget)) {
       yield* Effect.sync(() => {
         console.log(`\n${formatReport(results)}`);
@@ -169,9 +164,10 @@ async function finishAfterMutations(
   opts: ParsedCli,
   baseline: BaselineDocument | null,
   isFullScan: boolean,
+  agg: AggregatedRun,
+  targetKeys: readonly string[],
 ): Promise<void> {
-  const agg = lastAggregatedRun ?? createAggregatedRun();
-  const { exitCode } = await finalizeRun(opts, baseline, isFullScan, agg, lastTargetKeys);
+  const { exitCode } = await finalizeRun(opts, baseline, isFullScan, agg, targetKeys);
   process.exit(exitCode);
 }
 
@@ -185,18 +181,20 @@ export async function finalizeRun(
   const selectedKeys = new Set(targetKeys);
   const reported = filterReportedViolations(agg.violationsByFile, selectedKeys);
   const toolCode = mutationToolExitCode(agg.allResults);
-  const report = buildQualityReport(reported, baseline, toolCode);
 
   if (opts.seed) {
     const seedDoc = buildSeedBaseline(reported);
     await writeBaselineIfChanged(opts.baselinePath, seedDoc);
-    emitOutput(opts, report, agg);
-    return { exitCode: 0 };
+    const report = buildQualityReport(reported, seedDoc, toolCode);
+    const exitCode = toolCode >= 3 ? 3 : 0;
+    emitOutput(opts, { ...report, exitCode, ok: exitCode === 0 }, agg);
+    return { exitCode };
   }
 
+  const report = buildQualityReport(reported, baseline, toolCode);
   const failsBaseline = baselineWouldFail(reported, baseline, selectedKeys);
   if (opts.updateBaseline) {
-    if (failsBaseline || newViolationsWouldIncreaseBaseline(reported, baseline, selectedKeys)) {
+    if (failsBaseline) {
       emitOutput(opts, { ...report, exitCode: 1, ok: false }, agg);
       return { exitCode: 1 };
     }
@@ -262,6 +260,15 @@ export function emitOutput(opts: ParsedCli, report: QualityReport, agg: Aggregat
   }
 }
 
+export function registerMutationInterrupt(fiber: Fiber.RuntimeFiber<AggregatedRun, unknown>): void {
+  let interrupted = false;
+  process.on("SIGINT", () => {
+    if (interrupted) return;
+    interrupted = true;
+    Effect.runFork(Fiber.interrupt(fiber));
+  });
+}
+
 function printScanResults(sites: readonly MutationSite[]): void {
   console.log(`Found ${sites.length} mutation sites:\n`);
   for (const site of sites) printSite(site);
@@ -275,7 +282,7 @@ function verboseProgress(current: number, total: number, result: MutationResult)
   defaultProgress(current, total, result);
   console.log(`  - ${result.site.originalText}`);
   console.log(`  + ${result.site.mutatedText}`);
-  if (result.testOutput) console.log(indent(result.testOutput));
+  if (result.testOutput) console.log(indentTestOutput(result.testOutput));
   console.log();
 }
 
@@ -283,11 +290,4 @@ function defaultProgress(current: number, total: number, result: MutationResult)
   const status = result.outcome.status.toUpperCase();
   const loc = `${result.site.filePath}:${result.site.line}`;
   console.log(`[${current}/${total}] ${status} ${loc} ${result.site.description}`);
-}
-
-function indent(text: string): string {
-  return text
-    .split("\n")
-    .map((line) => `    ${line}`)
-    .join("\n");
 }
