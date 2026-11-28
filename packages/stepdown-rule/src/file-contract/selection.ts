@@ -1,4 +1,5 @@
 import type { IFileService } from "../services/types";
+import { comparePath } from "./compare-path";
 import { shouldProcessExplicitListFile } from "./file-filter";
 import { normalizeBaselineKey } from "./path-key";
 import { pathExists } from "./read-inputs";
@@ -45,7 +46,7 @@ export async function buildFileSelection(
 			raw.add(normalizeBaselineKey(file));
 		}
 	}
-	const scopedKeys = await filterScopedKeys([...raw].sort((a, b) => a.localeCompare(b)));
+	const scopedKeys = await filterScopedKeys([...raw].sort(comparePath));
 	return {
 		mode: "scoped",
 		patterns: inputs.legacyPatterns.length > 0 ? inputs.legacyPatterns : [DEFAULT_SCAN_PATTERN],

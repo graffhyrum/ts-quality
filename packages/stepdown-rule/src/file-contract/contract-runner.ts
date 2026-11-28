@@ -26,7 +26,10 @@ export type ContractInvocation = {
 export type ContractRunOptions = {
 	ignore?: string[];
 	json?: boolean;
+	/** User-supplied --format only (not agents envelope injection). */
 	format?: string;
+	/** Agents subcommand output (envelope); not checked against --report json. */
+	agentsEnvelope?: boolean;
 	config?: string;
 	rules?: string;
 	verbose?: boolean;
@@ -53,8 +56,9 @@ export async function runContractCommand(invocation: ContractInvocation): Promis
 	}
 	const reportJson = options.report === "json";
 	const legacyJson = Boolean(options.json);
-	const legacyFormat = options.format === "json" || options.format === "agents";
-	if (reportJson && (legacyJson || legacyFormat)) {
+	const userFormat = options.format;
+	const userLegacyFormat = userFormat === "json" || userFormat === "agents";
+	if (reportJson && (legacyJson || userLegacyFormat)) {
 		failUsage("cannot combine --report json with --json or --format");
 	}
 	if (
@@ -69,9 +73,11 @@ export async function runContractCommand(invocation: ContractInvocation): Promis
 	if (options.filesFrom === "-" && options.renamesFrom === "-") {
 		failUsage("cannot read --files-from and --renames-from from stdin at the same time");
 	}
-	const reporter = createReporter(resolveFormat(options));
-	const agentsCommand = options.format === "agents" ? `agents/${command}` : command;
-	const built = await buildConfigFromCliSafe(options);
+	const reporter = createReporter(options.agentsEnvelope ? "agents" : resolveFormat(options));
+	const agentsCommand =
+		options.agentsEnvelope || options.format === "agents" ? `agents/${command}` : command;
+	const configOptions = options.agentsEnvelope ? { ...options, format: "agents" } : options;
+	const built = await buildConfigFromCliSafe(configOptions);
 	if ("error" in built) {
 		emitCliError(built.error);
 		process.exitCode = reportJson
@@ -164,7 +170,7 @@ export async function runContractCommand(invocation: ContractInvocation): Promis
 			selection.mode === "full"
 				? await discoverFullScanKeys(selection.patterns, fileService)
 				: selection.scopedKeys;
-		const legacyPatterns = selection.mode === "full" ? selection.patterns : selection.patterns;
+		const legacyPatterns = selection.patterns;
 		let analysisResults: AnalysisResult[];
 		let fixResults: FixResult[] | undefined;
 		if (command === "analyze") {
@@ -205,17 +211,7 @@ export async function runContractCommand(invocation: ContractInvocation): Promis
 				printQualityReport({ ...seeded.report, exitCode: 0, ok: true });
 				process.exit(0);
 			}
-			process.exitCode = baselineExitOrLegacy(
-				baselineOnDisk,
-				violationCountByFile,
-				reportKeys,
-				reporter,
-				analysisResults,
-				fixResults,
-				command,
-				options,
-				agentsCommand,
-			);
+			process.exitCode = 0;
 			return;
 		}
 		const evaluated = await evaluateAgainstBaseline({
@@ -253,36 +249,6 @@ export async function runContractCommand(invocation: ContractInvocation): Promis
 	} catch (error) {
 		handleFatal(error, reportJson);
 	}
-}
-function baselineExitOrLegacy(
-	baselineOnDisk: Awaited<ReturnType<typeof readBaselineFile>>,
-	violationCountByFile: Map<string, number>,
-	reportKeys: string[],
-	reporter: Reporter,
-	analysisResults: AnalysisResult[],
-	fixResults: FixResult[] | undefined,
-	command: "analyze" | "fix",
-	options: ContractRunOptions,
-	agentsCommand: string,
-): number {
-	const exitCode = resolveExitCode({
-		baselineOnDisk,
-		evaluatedExit: exitCodeWithoutBaseline(violationCountByFile, reportKeys),
-		violationCountByFile,
-		reportKeys,
-	});
-	return emitLegacyOutput({
-		command,
-		analysisResults,
-		fixResults,
-		reporter,
-		options,
-		agentsCommand,
-		exitCode,
-		baselineOnDisk,
-		violationCountByFile,
-		reportKeys,
-	});
 }
 function resolveExitCode(context: {
 	baselineOnDisk: Awaited<ReturnType<typeof readBaselineFile>>;

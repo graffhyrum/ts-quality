@@ -1,7 +1,9 @@
 import { Command } from "commander";
 import packageJson from "../package.json" with { type: "json" };
+
 import { registerAgentsCommand } from "./cli-agents";
 import { handleUnexpectedError } from "./cli-handlers";
+import { createReporter, resolveFormat } from "./reporter";
 import {
 	baselineOption,
 	filesFromOption,
@@ -61,7 +63,7 @@ export function createProgram(): Command {
 					options,
 				});
 			} catch (error) {
-				handleUnexpectedError(error, options);
+				handleUnexpectedError(error, createReporter(resolveFormat(options)));
 			}
 		});
 
@@ -93,7 +95,7 @@ export function createProgram(): Command {
 					options,
 				});
 			} catch (error) {
-				handleUnexpectedError(error, options);
+				handleUnexpectedError(error, createReporter(resolveFormat(options)));
 			}
 		});
 

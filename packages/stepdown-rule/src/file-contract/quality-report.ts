@@ -1,3 +1,4 @@
+import { comparePath } from "./compare-path";
 import { QUALITY_REPORT_SCHEMA, type QualityReport, type QualityReportFile } from "./types";
 
 export function buildQualityReport(rows: QualityReportFile[], exitCode: number): QualityReport {
@@ -8,7 +9,7 @@ export function buildQualityReport(rows: QualityReportFile[], exitCode: number):
 		tool: "stepdown-rule",
 		exitCode,
 		ok: exitCode === 0,
-		files: [...rows].sort((a, b) => a.path.localeCompare(b.path)),
+		files: [...rows].sort((a, b) => comparePath(a.path, b.path)),
 		totals: { files: rows.length, violations, failed },
 	};
 }

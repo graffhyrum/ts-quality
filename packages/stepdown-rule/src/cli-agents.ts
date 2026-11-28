@@ -59,7 +59,7 @@ export function registerAgentsCommand(program: Command): void {
 				await runContractCommand({
 					command: "analyze",
 					patterns,
-					options: { ...options, format: "agents" },
+					options: { ...options, agentsEnvelope: true },
 				});
 			} catch (error) {
 				handleAgentsFailure("agents/analyze", error);
@@ -91,7 +91,7 @@ export function registerAgentsCommand(program: Command): void {
 				await runContractCommand({
 					command: "fix",
 					patterns,
-					options: { ...options, format: "agents" },
+					options: { ...options, agentsEnvelope: true },
 				});
 			} catch (error) {
 				handleAgentsFailure("agents/fix", error);
