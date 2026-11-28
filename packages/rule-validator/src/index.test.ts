@@ -42,6 +42,8 @@ const {
 	printViolations,
 	scanFile,
 	scanFiles,
+	scanFilesList,
+	shouldProcessExplicitListFile,
 	shouldProcessFile,
 } = (await import("./index.ts?fresh" as never)) as typeof import("./index");
 
@@ -114,6 +116,32 @@ describe("checkLineForViolations", () => {
 		checkLineForViolations(params);
 
 		expect(violations).toHaveLength(0);
+	});
+});
+
+describe("scanFilesList", () => {
+	it("scans an explicit path list", async () => {
+		const name = `.rv-scan-list-${Date.now()}.ts`;
+		writeFileSync(name, "const violation = 1;\n");
+		try {
+			const result = await scanFilesList([name], { json: true });
+			expect(result.fileCount).toBe(1);
+			expect(result.violations?.length).toBeGreaterThan(0);
+		} finally {
+			unlinkSync(name);
+		}
+	});
+
+	it("skips extensions outside the explicit allowlist", async () => {
+		const result = await scanFilesList(["readme.md"], { json: true });
+		expect(result.fileCount).toBe(0);
+	});
+});
+
+describe("shouldProcessExplicitListFile", () => {
+	it("accepts explicit-list extensions and honors exclude name", () => {
+		expect(shouldProcessExplicitListFile("lib/a.mjs")).toBe(true);
+		expect(shouldProcessExplicitListFile("rule-validator/index.ts", "rule-validator")).toBe(false);
 	});
 });
 
