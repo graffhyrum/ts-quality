@@ -75,6 +75,18 @@ describe("file-contract baseline IO", () => {
     expect(sorted.indexOf('"a.ts"')).toBeLessThan(sorted.indexOf('"b.ts"'));
   });
 
+  test("serializeBaseline sorts keys by UTF-16 code-unit order", () => {
+    const json = serializeBaseline({
+      version: 1,
+      files: { a: 1, _x: 2, B: 3 },
+    });
+    const posB = json.indexOf('"B"');
+    const posUnderscore = json.indexOf('"_x"');
+    const posA = json.indexOf('"a"');
+    expect(posB).toBeLessThan(posUnderscore);
+    expect(posUnderscore).toBeLessThan(posA);
+  });
+
   test("rejects invalid baseline bytes", async () => {
     const path = join(dir, "bad.json");
     writeFileSync(path, "{not json");

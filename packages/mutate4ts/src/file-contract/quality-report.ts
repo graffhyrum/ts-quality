@@ -1,4 +1,5 @@
 import { allowedCount } from "./baseline.ts";
+import { comparePath } from "./path-key.ts";
 import {
   QUALITY_REPORT_SCHEMA,
   type BaselineDocument,
@@ -12,7 +13,7 @@ export function buildQualityReport(
   toolExitCode: number,
 ): QualityReport {
   const files: QualityReportFile[] = [];
-  const sortedKeys = [...violationsByFile.keys()].sort((a, b) => a.localeCompare(b));
+  const sortedKeys = [...violationsByFile.keys()].sort(comparePath);
   for (const path of sortedKeys) {
     const violations = violationsByFile.get(path) ?? 0;
     const base = allowedCount(baseline, path);

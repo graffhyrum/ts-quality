@@ -1,5 +1,6 @@
 import { promises as fs } from "node:fs";
 import { hasFullScanExtension, isExcludedFromDiscovery } from "./extensions.ts";
+import { comparePath } from "./path-key.ts";
 import { pathExists } from "./read-inputs.ts";
 
 const DISCOVERY_GLOB = "**/*.{ts,tsx,mts,cts}";
@@ -13,5 +14,5 @@ export async function discoverFullScanKeys(): Promise<string[]> {
     if (!(await pathExists(key))) continue;
     keys.push(key);
   }
-  return keys.sort((a, b) => a.localeCompare(b));
+  return keys.sort(comparePath);
 }

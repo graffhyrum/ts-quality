@@ -1,6 +1,6 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { normalizeBaselineKey, UsageError } from "./path-key.ts";
+import { comparePath, normalizeBaselineKey, UsageError } from "./path-key.ts";
 import { pathExists } from "./read-inputs.ts";
 import { BASELINE_VERSION, type BaselineDocument, type RenamePair } from "./types.ts";
 
@@ -60,7 +60,7 @@ export async function applyRenamesInMemory(
   baseline: BaselineDocument,
   pairs: RenamePair[],
 ): Promise<BaselineDocument> {
-  const sorted = [...pairs].sort((a, b) => a.to.localeCompare(b.to));
+  const sorted = [...pairs].sort((a, b) => comparePath(a.to, b.to));
   validateRenameGraph(sorted);
   const files = { ...baseline.files };
   let remaining = [...sorted];
@@ -122,7 +122,7 @@ export async function writeBaselineIfChanged(
 }
 
 export function serializeBaseline(doc: BaselineDocument): string {
-  const sortedKeys = Object.keys(doc.files).sort((a, b) => a.localeCompare(b));
+  const sortedKeys = Object.keys(doc.files).sort(comparePath);
   const files: Record<string, number> = {};
   for (const key of sortedKeys) {
     const count = doc.files[key];

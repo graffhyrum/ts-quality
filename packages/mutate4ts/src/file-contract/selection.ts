@@ -1,4 +1,5 @@
 import { hasExplicitListExtension } from "./extensions.ts";
+import { comparePath } from "./path-key.ts";
 import { pathExists } from "./read-inputs.ts";
 
 export type SelectionMode = "full" | "scoped";
@@ -30,7 +31,7 @@ export function resolveSelectionMode(inputs: TargetingInputs): SelectionMode {
 }
 
 export async function buildScopedKeys(literalPaths: string[]): Promise<string[]> {
-  const raw = [...new Set(literalPaths)].sort((a, b) => a.localeCompare(b));
+  const raw = [...new Set(literalPaths)].sort(comparePath);
   const out: string[] = [];
   for (const key of raw) {
     if (!hasExplicitListExtension(key)) continue;

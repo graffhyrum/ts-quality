@@ -1,5 +1,10 @@
 import path from "node:path";
 
+/** UTF-16 code-unit lexicographic order (ADR baseline/report key order). */
+export function comparePath(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
 export function normalizeBaselineKey(raw: string, cwd = process.cwd()): string {
   const stripped = raw.replace(/\r$/, "");
   if (stripped.includes("\n") || stripped.includes("\0")) {
