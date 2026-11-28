@@ -1,0 +1,29 @@
+{
+  "name": "@graffhyrum/file-selector",
+  "version": "0.1.0",
+  "private": true,
+  "description": "List staged git paths for file-scoped quality gates",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "file-selector": "src/cli.ts"
+  },
+  "files": [
+    "src/**/*.ts",
+    "!src/**/*.test.ts",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "fmt": "bun fmt --no-script src package.json tsconfig.json",
+    "fmt:check": "bun fmt --no-script --check src package.json tsconfig.json",
+    "lint": "oxlint src",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "bun test",
+    "vet": "bun run fmt:check && bun run lint && bun run typecheck && bun run test"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.4",
+    "oxlint": "^1.89.0",
+    "typescript": "^6.0.3"
+  }
+}
