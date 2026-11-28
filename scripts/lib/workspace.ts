@@ -30,10 +30,17 @@ export const TEMPLATE = {
   gates: ["vet", "build"],
 } as const;
 
+// CI gates this CLI. Release packing stays on TOOL_PACKAGES, which template export
+// requires a published release for; the template does not install file-selector.
+export const FILE_SELECTOR = {
+  dir: "packages/file-selector",
+  gates: ["vet"],
+} as const;
+
 export const GATED_DIRS: readonly {
   readonly dir: string;
   readonly gates: readonly string[];
-}[] = [...TOOL_PACKAGES, TEMPLATE];
+}[] = [...TOOL_PACKAGES, FILE_SELECTOR, TEMPLATE];
 
 /** File name `bun pm pack` writes for a package: scope `@a/b` becomes `a-b`. */
 export function tarballName(name: string, version: string): string {
