@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { formatReport } from "./report.ts";
+import { formatReport, indentTestOutput } from "./report.ts";
 import type { MutationOutcome, MutationResult } from "./execute.ts";
 
 function resultWith(outcome: MutationOutcome): MutationResult {
@@ -54,4 +54,8 @@ test("a run without errors prints no error messages section", () => {
 
 test("no results score 0.0%", () => {
   expect(formatReport([])).toContain("Mutation Score: 0.0%");
+});
+
+test("indentTestOutput prefixes each line", () => {
+  expect(indentTestOutput("fail\nline")).toBe("    fail\n    line");
 });

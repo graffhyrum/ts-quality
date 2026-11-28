@@ -1,5 +1,7 @@
 import { test, expect, describe, spyOn } from "bun:test";
-import { parseCliOptions } from "./cli.ts";
+import { parseCliOptions, validateCliContract, exitWithJsonError } from "./cli.ts";
+import type { ParsedCli } from "./cli.ts";
+import { UsageError } from "./file-contract/path-key.ts";
 
 function argv(...args: string[]): string[] {
   return ["bun", "script.ts", ...args];
@@ -8,7 +10,7 @@ function argv(...args: string[]): string[] {
 describe("parseCliOptions", () => {
   test("parses positional sourceFile argument", () => {
     const opts = parseCliOptions(argv("src/index.ts"));
-    expect(opts.sourceFile).toBe("src/index.ts");
+    expect(opts.legacySourceFile).toBe("src/index.ts");
   });
 
   test("parses --scan flag", () => {
@@ -42,6 +44,68 @@ describe("parseCliOptions", () => {
     expect(opts.testCommand).toEqual(["bun", "test"]);
     expect(opts.timeoutFactor).toBe(2);
     expect(opts.verbose).toBe(false);
+  });
+
+  test("parses file-list and baseline flags", () => {
+    const opts = parseCliOptions(
+      argv(
+        "--files",
+        "a.ts",
+        "--files=b.ts",
+        "--files-from",
+        "list.txt",
+        "--report",
+        "json",
+        "--baseline",
+        ".quality/x.json",
+        "--update-baseline",
+        "--seed",
+      ),
+    );
+    expect(opts.filesFlags).toEqual(["a.ts", "b.ts"]);
+    expect(opts.filesFrom).toBe("list.txt");
+    expect(opts.report).toBe("json");
+    expect(opts.baselinePath).toBe(".quality/x.json");
+    expect(opts.updateBaseline).toBe(true);
+    expect(opts.seed).toBe(true);
+    expect(opts.legacySourceFile).toBeUndefined();
+  });
+});
+
+describe("validateCliContract", () => {
+  const base: ParsedCli = {
+    scan: false,
+    testCommand: ["bun", "test"],
+    lines: undefined,
+    verbose: false,
+    timeoutFactor: 2,
+    filesFlags: [],
+    filesFrom: undefined,
+    renamesFrom: undefined,
+    report: "human",
+    baselinePath: ".quality/mutate4ts-baseline.json",
+    updateBaseline: false,
+    seed: false,
+    legacySourceFile: undefined,
+  };
+
+  test("rejects incompatible seed flags", () => {
+    expect(() => validateCliContract({ ...base, seed: true, updateBaseline: true })).toThrow(
+      UsageError,
+    );
+    expect(() => validateCliContract({ ...base, seed: true, filesFlags: ["a.ts"] })).toThrow(
+      UsageError,
+    );
+  });
+
+  test("rejects --scan with --report json", () => {
+    expect(() => validateCliContract({ ...base, scan: true, report: "json" })).toThrow(UsageError);
+  });
+
+  test("rejects stdin for both path lists", () => {
+    expect(() => validateCliContract({ ...base, filesFrom: "-", renamesFrom: "-" })).toThrow(
+      UsageError,
+    );
   });
 });
 
@@ -80,7 +144,7 @@ describe("exit paths", () => {
   test("--help prints usage and exits 0", () => {
     const { code, out } = captureExit(() => parseCliOptions(argv("--help")));
     expect(code).toBe(0);
-    expect(out).toStartWith("Usage: mutate4ts [options] <sourceFile>");
+    expect(out).toStartWith("Usage: mutate4ts [options] [sourceFile]");
   });
 
   test("invalid --lines value prints error and usage to stderr, exits 2", () => {
@@ -92,17 +156,28 @@ describe("exit paths", () => {
     expect(err).toContain("Usage: mutate4ts");
   });
 
-  test("missing source file prints error and usage, exits 2", () => {
-    const { code, err } = captureExit(() => parseCliOptions(argv("--scan")));
-    expect(code).toBe(2);
-    expect(err).toContain("Error: ");
-    expect(err).toContain("Usage: mutate4ts");
-  });
-
   test("unknown flag exits 2", () => {
     const { code, err } = captureExit(() => parseCliOptions(argv("--nope")));
     expect(code).toBe(2);
     expect(err).toContain("Unknown flag: --nope");
+  });
+
+  test("exitWithJsonError exits 2", () => {
+    const { code, err } = captureExit(() => exitWithJsonError("bad json mode"));
+    expect(code).toBe(2);
+    expect(err).toContain("bad json mode");
+  });
+
+  test("--files without value exits 2", () => {
+    const { code, err } = captureExit(() => parseCliOptions(argv("--files")));
+    expect(code).toBe(2);
+    expect(err).toContain("--files requires a path");
+  });
+
+  test("unknown --report value exits 2", () => {
+    const { code, err } = captureExit(() => parseCliOptions(argv("--report", "xml")));
+    expect(code).toBe(2);
+    expect(err).toContain("Unknown --report value");
   });
 
   test("invalid --timeout-factor exits 2", () => {

@@ -18,4 +18,9 @@ describe("unary mutations", () => {
     const sites = unarySites("function f(x: number) { return -x; }");
     expect(sites).toContainEqual(expect.objectContaining({ originalText: "-x", mutatedText: "x" }));
   });
+
+  test("ignores unsupported unary operators", () => {
+    const sites = unarySites("function f(x: number) { return +x; }");
+    expect(sites).toHaveLength(0);
+  });
 });

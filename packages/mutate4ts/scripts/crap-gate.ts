@@ -1,8 +1,11 @@
 import { capture, type Capture } from "./capture.ts";
 
-const coverage = await capture(["bun", "test", "--coverage", "--coverage-reporter=lcov"], {
-  env: { AGENT: "1" },
-});
+const coverage = await capture(
+  ["bun", "test", "--coverage", "--coverage-reporter=lcov", "--coverage-reporter=text"],
+  {
+    env: { AGENT: "1" },
+  },
+);
 if (coverage.exitCode !== 0) fail("coverage", coverage);
 
 const score = await capture([
