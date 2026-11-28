@@ -19,17 +19,6 @@ On `main` at `aa02b45`:
 
 Home will call the selector from `vet --at-commit` (graffhyrum/home#117), from a pre-push hook (graffhyrum/home#122), and CI will run the full-project command once (graffhyrum/home#123). This repository does not change those hooks in the selector PR.
 
-## Conflicts with the task prompt
-
-The issue wins where it disagrees with the implementation prompt.
-
-1. The prompt says to map each CLI onto `--files` / `--files-from` without keeping a second targeting mode. The issue says the positionals and globs already on crap4ts and stepdown-rule keep working. This ADR keeps those spellings, and the mutate4ts source-file positional, as aliases that fill the same selection set as `--files`. One set, one baseline, one report. A legacy spelling is not a second semantic mode.
-2. The prompt says mutate4ts has no targeting and that an empty list is identical to today's behavior. The issue says mutate4ts requires one source file and has no project-wide mode, and the contract still adds a whole-project run. This ADR follows the issue. `mutate4ts <sourceFile>` stays a one-file run. `mutate4ts` with no targeting arguments becomes the whole-project scan defined below. That no-argument change is a breaking change and ships as a major bump in the mutate4ts PR. "Matches today" for mutate4ts means the positional invocation, not the no-argument invocation.
-3. The issue lists baseline carry on rename as selector acceptance. The prompt says shrink-only baseline tests belong to the package PRs and must not be stubbed in the selector PR. This ADR specifies the carry here. The selector PR tests the path list and the rename pair. It does not write a baseline file. The package tests below are the ones that move a baseline key.
-4. The prompt says to add a shared runtime module only when the repo already has one, and otherwise later PRs target `main`. The issue says to add `packages/file-selector`. This ADR follows the issue. The package is a CLI. The four quality packages must not depend on it and must not import it. Later package PRs target `main`.
-
-Partial staging is a choice the issue allows, not a conflict. This ADR refuses a partially staged path instead of checking an index snapshot.
-
 ## Decision
 
 ### Selector
@@ -45,7 +34,7 @@ file-selector [--staged] [--since <rev>] [--format text|json] [--cwd <dir>]
 - `--staged` is the default. It diffs the index against `HEAD` (`git diff --cached -z --name-status --find-renames HEAD`). With no commit yet, it diffs the index against the empty tree.
 - `--since <rev>` diffs `<rev>...HEAD` (triple-dot). It cannot be combined with `--staged`. `<rev>` is one revision, not a range: empty, leading `-`, `..`, whitespace, or a backslash is a usage error. Git must resolve `<rev>^{commit}`.
 - `--cwd` defaults to the process cwd. The repository is discovered from that directory.
-- The process drops `GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`, `GIT_PREFIX`, `GIT_COMMON_DIR`, and `GIT_OBJECT_DIRECTORY` before it runs git, so a parent environment cannot point it at a different index.
+- The process drops `GIT_DIR`, `GIT_WORK_TREE`, `GIT_PREFIX`, `GIT_COMMON_DIR`, and `GIT_OBJECT_DIRECTORY` before it runs git. It keeps `GIT_INDEX_FILE`.
 - `--help` and `--version` exit 0. Help goes to stdout. `--version` prints the package version and a newline.
 
 Rename detection is git's default similarity (`--find-renames`, 50%). A rename git reports below that threshold is a delete plus an add, and the baseline does not carry. Packages must not add a second rename detector. A copy (`C`) is a new path. It is not a rename.
@@ -311,17 +300,6 @@ Exit codes for `--report json`:
 When several mutate4ts outcomes happen in one run, the exit code is the highest of 1, 3, and 4, as ADR 0001 already says. Default mode, without `--report json`, keeps each tool's existing extra codes (stepdown 3, 4, and 5 included) so current callers do not change. The pass/fail decision for violation counts still follows the baseline in both modes.
 
 mutate4ts `--scan` does not read or write a baseline and rejects `--report json` with exit 2. With a file list, `--scan` limits itself to those files and otherwise stays today's scan.
-
-### Tests the selector PR owns
-
-A fixture git repository, not this monorepo's index. Each case is a temp repo with a local `user.email`, `user.name`, `commit.gpgsign=false`, and `core.hooksPath=/dev/null`.
-
-- Stage `a.ts`. Leave `b.ts` modified and unstaged, and add an untracked file. Text stdout is `a.ts\n` and nothing else. Restoring the unstaged edit and deleting the untracked file does not change that stdout. `--format json` has `files: ["a.ts"]`, empty `renames`, empty `deletes`. `files.join("\n") + "\n"` equals the text stdout.
-- `git mv a.ts sub/c.ts`. Text stdout is `sub/c.ts\n`. JSON `renames` is `{from: "a.ts", to: "sub/c.ts"}`. `a.ts` is not in `files` or `deletes`.
-- Stage a content edit of `a.ts` and `git rm b.ts`. Exit 0, text stdout `a.ts\n`, JSON `deletes` is `["b.ts"]`. With only the delete staged, exit 0, stdout empty, stderr empty.
-- Fully staged `a.ts` plus a worktree-only edit of `b.ts` exits 0 and lists `a.ts`. That is the passing partial-staging case.
-- Stage `a.ts` and `b.ts`, then edit `a.ts` again without staging. Exit 1, stdout empty, stderr exactly `file-selector: partially staged: a.ts\n`. `b.ts` is not emitted.
-- Text stdout is either empty or one trailing newline and no empty line, which is the split `--files-from -` performs: empty string means no paths; otherwise drop the last character and split on `\n`.
 
 ### Tests each later package PR must add
 

@@ -40,8 +40,8 @@ export async function selectPaths(cwd: string, mode: Mode): Promise<Selection> {
   const selection = toSelection(diff);
   const dirtyArgs =
     mode.kind === "staged"
-      ? ["diff", "--name-only", "-z"]
-      : ["diff", "--name-only", "-z", "HEAD"];
+      ? ["diff", "--no-renames", "--name-only", "-z"]
+      : ["diff", "--no-renames", "--name-only", "-z", "HEAD"];
   const dirty = await requireGit(dirtyArgs, toplevel);
   const partial = partialPaths(selection.files, splitDirty(dirty));
   if (partial.length > 0) {
@@ -55,12 +55,19 @@ export async function selectPaths(cwd: string, mode: Mode): Promise<Selection> {
   return selection;
 }
 
+/** Git ends `--show-toplevel` with a newline. A trailing space in the path stays. */
+function stripTerminatingNewline(text: string): string {
+  if (text.endsWith("\r\n")) return text.slice(0, -2);
+  if (text.endsWith("\n")) return text.slice(0, -1);
+  return text;
+}
+
 async function repoRoot(cwd: string): Promise<string> {
   const result = await spawnGit(["rev-parse", "--show-toplevel"], cwd);
   if (result.exitCode !== 0) {
     throw new SelectorFailure(2, "file-selector: not a git repository");
   }
-  const root = decodeUtf8(result.stdout).trim();
+  const root = stripTerminatingNewline(decodeUtf8(result.stdout));
   if (root.length === 0) {
     throw new SelectorFailure(2, "file-selector: not a git repository");
   }

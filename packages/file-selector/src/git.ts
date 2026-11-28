@@ -3,7 +3,6 @@ import { SelectorFailure } from "./failure.ts";
 const HIDDEN_GIT_ENV = new Set([
   "GIT_DIR",
   "GIT_WORK_TREE",
-  "GIT_INDEX_FILE",
   "GIT_PREFIX",
   "GIT_COMMON_DIR",
   "GIT_OBJECT_DIRECTORY",

@@ -34,6 +34,10 @@ describe("parseNameStatus", () => {
   test("a path that contains a newline cannot be a line-oriented list", () => {
     expect(() => toSelection(z("M\0a\nb.ts\0"))).toThrow(SelectorFailure);
   });
+
+  test("a path that starts with U+FEFF keeps that character", () => {
+    expect(toSelection(z("M\0\uFEFFold.ts\0")).files).toEqual(["\uFEFFold.ts"]);
+  });
 });
 
 describe("partialPaths", () => {

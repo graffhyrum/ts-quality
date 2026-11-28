@@ -43,7 +43,9 @@ export function splitNul(bytes: Uint8Array): string[] {
 
 export function decodeUtf8(bytes: Uint8Array): string {
   try {
-    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(
+      bytes,
+    );
   } catch {
     throw new SelectorFailure(2, "file-selector: git output is not UTF-8");
   }

@@ -33,10 +33,14 @@ async function withDir(run: (dir: string) => Promise<void>): Promise<void> {
   }
 }
 
-async function runGit(args: readonly string[], cwd: string): Promise<void> {
+async function runGit(
+  args: readonly string[],
+  cwd: string,
+  env: Readonly<Record<string, string>> = {},
+): Promise<void> {
   const proc = Bun.spawn(["git", ...args], {
     cwd,
-    env: gitEnv(),
+    env: { ...gitEnv(), ...env },
     stdin: "ignore",
     stdout: "pipe",
     stderr: "pipe",
@@ -78,10 +82,14 @@ async function initRepo(
   );
 }
 
-async function runCli(dir: string, args: readonly string[] = []): Promise<Run> {
+async function runCli(
+  dir: string,
+  args: readonly string[] = [],
+  env: Readonly<Record<string, string>> = {},
+): Promise<Run> {
   const proc = Bun.spawn(["bun", cli, ...args], {
     cwd: dir,
-    env: gitEnv(),
+    env: { ...gitEnv(), ...env },
     stdin: "ignore",
     stdout: "pipe",
     stderr: "pipe",
@@ -286,4 +294,68 @@ test("usage errors and a non-repository exit 2 with empty stdout", async () => {
     expect(result.stdout).toBe("");
     expect(result.stderr).toContain("not a git repository");
   });
+});
+
+test("the selector honors GIT_INDEX_FILE pointing at an alternate index", async () => {
+  await withDir(async (dir) => {
+    await initRepo(dir, {
+      "a.ts": "export const a = 1;\n",
+      "b.ts": "export const b = 1;\n",
+    });
+    await Bun.write(path.join(dir, "a.ts"), "export const a = 2;\n");
+    const alt = path.join(dir, "alt-index");
+    const indexEnv = { GIT_INDEX_FILE: alt };
+    await runGit(["read-tree", "HEAD"], dir, indexEnv);
+    await runGit(["add", "a.ts"], dir, indexEnv);
+    const mainIndex = await runCli(dir);
+    expect(mainIndex.exitCode).toBe(0);
+    expect(pathsFromSelectorStdout(mainIndex.stdout)).toEqual([]);
+    const alternate = await runCli(dir, [], indexEnv);
+    expect(alternate.exitCode).toBe(0);
+    expect(alternate.stderr).toBe("");
+    expect(pathsFromSelectorStdout(alternate.stdout)).toEqual(["a.ts"]);
+  });
+});
+
+test("a staged rename after the selected range is refused", async () => {
+  await withDir(async (dir) => {
+    await initRepo(dir, { "a.ts": "export const a = 1;\n" });
+    await Bun.write(path.join(dir, "a.ts"), "export const a = 2;\n");
+    await runGit(["add", "a.ts"], dir);
+    await runGit(
+      [
+        "-c",
+        "commit.gpgsign=false",
+        "-c",
+        "core.hooksPath=/dev/null",
+        "commit",
+        "-q",
+        "-m",
+        "edit a",
+      ],
+      dir,
+    );
+    await runGit(["mv", "a.ts", "b.ts"], dir);
+    const result = await runCli(dir, ["--since", "HEAD~1"]);
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toBe("file-selector: partially staged: a.ts\n");
+  });
+});
+
+test("a repository directory with a trailing space stays that directory", async () => {
+  const parent = await mkdtemp(path.join(tmpdir(), "file-selector-"));
+  const dir = path.join(parent, "repo ");
+  try {
+    await mkdir(dir);
+    await initRepo(dir, { "a.ts": "export const a = 1;\n" });
+    await Bun.write(path.join(dir, "a.ts"), "export const a = 2;\n");
+    await runGit(["add", "a.ts"], dir);
+    const result = await runCli(dir);
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(pathsFromSelectorStdout(result.stdout)).toEqual(["a.ts"]);
+  } finally {
+    await rm(parent, { recursive: true, force: true });
+  }
 });
