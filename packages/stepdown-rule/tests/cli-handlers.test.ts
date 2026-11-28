@@ -1,15 +1,26 @@
 import { expect, test } from "bun:test";
 import { handleUnexpectedError } from "../src/cli-handlers";
 import { ExitInternal } from "../src/exit-codes";
-import { createReporter } from "../src/reporter";
+import { createReporter, resolveFormat } from "../src/reporter";
 import { withCapturedIo } from "./cli-harness";
 
 test("handleUnexpectedError sets INTERNAL exit for human", async () => {
 	const { exitCode, stderr } = await withCapturedIo(() => {
-		handleUnexpectedError(new Error("boom"), false);
+		handleUnexpectedError(new Error("boom"), createReporter("human"));
 	});
 	expect(exitCode).toBe(ExitInternal);
 	expect(stderr).toMatch(/INTERNAL_ERROR|boom/);
+});
+
+test("handleUnexpectedError accepts createReporter(resolveFormat(options))", async () => {
+	const { exitCode, stderr } = await withCapturedIo(() => {
+		handleUnexpectedError(
+			new Error("boom"),
+			createReporter(resolveFormat({ json: false, format: undefined })),
+		);
+	});
+	expect(exitCode).toBe(ExitInternal);
+	expect(stderr).toMatch(/boom/);
 });
 
 test("handleUnexpectedError uses reporter early failure for agents", async () => {
