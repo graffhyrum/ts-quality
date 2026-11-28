@@ -2,8 +2,8 @@ import { Argument, Option } from "commander";
 
 export const patternsArgument = new Argument(
 	"[patterns...]",
-	'File patterns to analyze (default: "src/**/*.ts")',
-).default(["src/**/*.ts"]);
+	'File patterns to analyze; omit for full scan (default discovery: "src/**/*.ts")',
+);
 
 export const ignoreOption = new Option(
 	"--ignore <patterns...>",

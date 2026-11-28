@@ -1,7 +1,17 @@
 import { Command } from "commander";
 import packageJson from "../package.json" with { type: "json" };
 import { registerAgentsCommand } from "./cli-agents";
-import { handleUnexpectedError, runHumanAnalyze, runHumanFix } from "./cli-handlers";
+import { handleUnexpectedError } from "./cli-handlers";
+import {
+	baselineOption,
+	filesFromOption,
+	makeFilesOption,
+	renamesFromOption,
+	reportOption,
+	seedOption,
+	updateBaselineOption,
+} from "./file-contract/contract-options";
+import { runContractCommand } from "./file-contract/contract-runner";
 import { runDoctor } from "./doctor/handler";
 import type { DoctorOptions } from "./doctor/types";
 import {
@@ -14,8 +24,6 @@ import {
 	rulesOption,
 	verboseOption,
 } from "./cli-options";
-import { createReporter, resolveFormat } from "./reporter";
-
 export function createProgram(): Command {
 	const program = new Command();
 	program
@@ -38,12 +46,22 @@ export function createProgram(): Command {
 		.addOption(formatOption)
 		.addOption(verboseOption)
 		.addOption(rulesOption)
+		.addOption(makeFilesOption().default([]))
+		.addOption(filesFromOption)
+		.addOption(renamesFromOption)
+		.addOption(reportOption)
+		.addOption(baselineOption)
+		.addOption(updateBaselineOption)
+		.addOption(seedOption)
 		.action(async (patterns: string[], options) => {
-			const reporter = createReporter(resolveFormat(options));
 			try {
-				await runHumanAnalyze(patterns, options, reporter);
+				await runContractCommand({
+					command: "analyze",
+					patterns,
+					options,
+				});
 			} catch (error) {
-				handleUnexpectedError(error, reporter);
+				handleUnexpectedError(error, options);
 			}
 		});
 
@@ -60,12 +78,22 @@ export function createProgram(): Command {
 		.addOption(formatOption)
 		.addOption(rulesOption)
 		.addOption(dryRunOption)
+		.addOption(makeFilesOption().default([]))
+		.addOption(filesFromOption)
+		.addOption(renamesFromOption)
+		.addOption(reportOption)
+		.addOption(baselineOption)
+		.addOption(updateBaselineOption)
+		.addOption(seedOption)
 		.action(async (patterns: string[], options) => {
-			const reporter = createReporter(resolveFormat(options));
 			try {
-				await runHumanFix(patterns, options, reporter);
+				await runContractCommand({
+					command: "fix",
+					patterns,
+					options,
+				});
 			} catch (error) {
-				handleUnexpectedError(error, reporter);
+				handleUnexpectedError(error, options);
 			}
 		});
 

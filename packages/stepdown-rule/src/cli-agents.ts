@@ -8,7 +8,16 @@ import {
 	patternsArgument,
 	rulesOption,
 } from "./cli-options";
-import { prepareAnalyze, runAnalyze, runFix, type CliOptions } from "./cli-runners";
+import {
+	baselineOption,
+	filesFromOption,
+	makeFilesOption,
+	renamesFromOption,
+	reportOption,
+	seedOption,
+	updateBaselineOption,
+} from "./file-contract/contract-options";
+import { runContractCommand } from "./file-contract/contract-runner";
 import {
 	AgentsAnalyzeEnvelopeJsonSchema,
 	AgentsFixEnvelopeJsonSchema,
@@ -35,12 +44,23 @@ export function registerAgentsCommand(program: Command): void {
 		.addOption(ignoreOption)
 		.addOption(configOption)
 		.addOption(rulesOption)
+		.addOption(makeFilesOption().default([]))
+		.addOption(filesFromOption)
+		.addOption(renamesFromOption)
+		.addOption(reportOption)
+		.addOption(baselineOption)
+		.addOption(updateBaselineOption)
+		.addOption(seedOption)
 		.addOption(
 			new Option("--include-graph", "Include dependencyGraph in each file result").default(false),
 		)
 		.action(async (patterns: string[], options) => {
 			try {
-				await runAgentsAnalyze(patterns, options);
+				await runContractCommand({
+					command: "analyze",
+					patterns,
+					options: { ...options, format: "agents" },
+				});
 			} catch (error) {
 				handleAgentsFailure("agents/analyze", error);
 			}
@@ -53,6 +73,13 @@ export function registerAgentsCommand(program: Command): void {
 		.addOption(configOption)
 		.addOption(rulesOption)
 		.addOption(dryRunOption)
+		.addOption(makeFilesOption().default([]))
+		.addOption(filesFromOption)
+		.addOption(renamesFromOption)
+		.addOption(reportOption)
+		.addOption(baselineOption)
+		.addOption(updateBaselineOption)
+		.addOption(seedOption)
 		.addOption(
 			new Option(
 				"--include-content",
@@ -61,7 +88,11 @@ export function registerAgentsCommand(program: Command): void {
 		)
 		.action(async (patterns: string[], options) => {
 			try {
-				await runAgentsFix(patterns, options);
+				await runContractCommand({
+					command: "fix",
+					patterns,
+					options: { ...options, format: "agents" },
+				});
 			} catch (error) {
 				handleAgentsFailure("agents/fix", error);
 			}
@@ -81,57 +112,6 @@ export function registerAgentsCommand(program: Command): void {
 	agents.addCommand(fixCmd);
 	agents.addCommand(schemaCmd);
 	program.addCommand(agents);
-}
-
-async function runAgentsFix(
-	patterns: string[],
-	options: CliOptions & {
-		dryRun?: boolean;
-		includeContent?: boolean;
-	},
-): Promise<void> {
-	const preflight = await prepareAnalyze(patterns, options);
-	if (!preflight.ok) {
-		process.exitCode = agentsReporter.reportEarlyFailure("fix", preflight.errors, {
-			command: "agents/fix",
-		});
-		return;
-	}
-	const dryRun = options.dryRun ?? false;
-	const fixResults = await runFix(patterns, preflight.config, preflight.fileService, {
-		dryRun,
-		resolvedFiles: preflight.files,
-	});
-	process.exitCode = agentsReporter.reportFix(fixResults, {
-		dryRun,
-		includeContent: options.includeContent ?? false,
-		command: "agents/fix",
-	});
-}
-
-async function runAgentsAnalyze(
-	patterns: string[],
-	options: CliOptions & {
-		includeGraph?: boolean;
-	},
-): Promise<void> {
-	const preflight = await prepareAnalyze(patterns, options);
-	if (!preflight.ok) {
-		process.exitCode = agentsReporter.reportEarlyFailure("analyze", preflight.errors, {
-			command: "agents/analyze",
-		});
-		return;
-	}
-	const results = await runAnalyze(
-		patterns,
-		preflight.config,
-		preflight.fileService,
-		preflight.files,
-	);
-	process.exitCode = agentsReporter.reportAnalyze(results, {
-		includeGraph: options.includeGraph ?? false,
-		command: "agents/analyze",
-	});
 }
 
 function handleAgentsFailure(command: string, error: unknown): void {
