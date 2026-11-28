@@ -14,6 +14,7 @@ function makeFs(files: Record<string, string>): FileSystem {
 }
 
 function config(overrides: Partial<Config> = {}): Config {
+  const legacyFiles = overrides.targeting?.legacyFiles ?? overrides.files ?? ["src/a.ts"];
   return {
     coveragePath: path.resolve("cov.json"),
     format: "istanbul",
@@ -26,10 +27,25 @@ function config(overrides: Partial<Config> = {}): Config {
     onlyCrappyDeprecated: false,
     include: "**/*.ts",
     exclude: "**/node_modules/**",
-    files: ["src/a.ts"],
+    files: legacyFiles,
     init: false,
     skipGitignore: true,
     quiet: false,
+    reportJson: false,
+    baselinePath: ".quality/crap4ts-baseline.json",
+    updateBaseline: false,
+    seed: false,
+    targeting: {
+      filesFlags: [],
+      filesFromPaths: [],
+      filesFromPresent: false,
+      filesFromEmpty: false,
+      legacyFiles,
+      legacyPresent: legacyFiles.length > 0,
+      renamesFrom: undefined,
+      renamePairs: [],
+      ...(overrides.targeting ?? {}),
+    },
     ...overrides,
   };
 }
@@ -65,9 +81,9 @@ describe("runPipeline filesystem", () => {
     ).rejects.toThrow(CrapError);
   });
 
-  test("a file present on disk is ignored when the injected filesystem says it is absent", async () => {
+  test("a missing scoped path yields exit 0 with no analyzed files", async () => {
     const code = await runPipeline(config({ files: ["src/pipeline.ts"] }), makeFs({}));
-    expect(code).toBe(2);
+    expect(code).toBe(0);
   });
 
   test("--only-crappy prints the deprecation warning", async () => {
