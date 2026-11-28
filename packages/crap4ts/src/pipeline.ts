@@ -111,7 +111,7 @@ async function buildAnalysisPlan(config: Config, fs: FileSystem): Promise<Analys
     const sourcePaths = scopedKeys.map((key) => absolutePathForKey(key));
     return { mode, scopedKeys, sourcePaths, reportKeys: scopedKeys };
   }
-  const sourcePaths = await resolveGlobFiles(config.include, config.exclude, gitignoreGlobs, fs);
+  const sourcePaths = await resolveGlobFiles(config.include, config.exclude, gitignoreGlobs);
   const reportKeys = sourcePaths.map((p) => functionFileKey(p)).sort(comparePath);
   return { mode, scopedKeys: [], sourcePaths, reportKeys };
 }
@@ -260,7 +260,6 @@ async function resolveGlobFiles(
   include: string,
   exclude: string,
   gitignoreGlobs: Glob[],
-  fs: FileSystem,
 ): Promise<string[]> {
   const includeGlob = new Glob(include);
   const excludeGlob = new Glob(exclude);
