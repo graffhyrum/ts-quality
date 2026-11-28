@@ -2,7 +2,7 @@
 // Verifies key collision handling and regex-over-AST preference.
 import path from "node:path";
 import { describe, expect, it } from "bun:test";
-import { deduplicateDisplayViolations, deduplicateJsonViolations } from "./cli.ts";
+import { deduplicateDisplayViolations, deduplicateJsonViolations } from "./scan-dedup.ts";
 import type { DisplayViolation, JsonViolation } from "./index.ts";
 import { asRelativePosix } from "./paths.ts";
 

@@ -29,11 +29,7 @@ import {
 	type ScanResult,
 } from "./index.ts";
 import { printRunFooter, printRunHeader } from "./run-frame.ts";
-import {
-	type CombinedScanResult,
-	deduplicateDisplayViolations,
-	deduplicateJsonViolations,
-} from "./scan-dedup.ts";
+import { combineRegexAndAstScanResults, type CombinedScanResult } from "./scan-dedup.ts";
 const CONTRACT_FLAG_PREFIXES = [
 	"--files",
 	"--files-from",
@@ -66,41 +62,11 @@ export function deduplicateAndPrint(
 	ast: ScanResult,
 	shouldPrint: boolean = true,
 ): CombinedScanResult {
-	const regexDisplay = regex.displayViolations ?? [];
-	const astDisplay = ast.displayViolations ?? [];
-	const dedupedDisplay = deduplicateDisplayViolations(regexDisplay, astDisplay);
-	if (shouldPrint && dedupedDisplay.length > 0) printDedupedDisplay(dedupedDisplay);
-	const regexViolations = regex.violations ?? [];
-	const astViolations = ast.violations ?? [];
-	const dedupedJson = deduplicateJsonViolations(regexViolations, astViolations);
-	const combinedCounts = selectCounts({
-		dedupedDisplay,
-		dedupedJson,
-		regex,
-		ast,
-	});
-	return {
-		errorCount: combinedCounts.errorCount,
-		warningCount: combinedCounts.warningCount,
-		fileCount: (regex.fileCount ?? 0) + (ast.fileCount ?? 0),
-		violations: dedupedJson.length > 0 ? dedupedJson : dedupedDisplay,
-	};
-}
-function selectCounts(context: {
-	dedupedDisplay: DisplayViolation[];
-	dedupedJson: JsonViolation[];
-	regex: ScanResult;
-	ast: ScanResult;
-}): {
-	errorCount: number;
-	warningCount: number;
-} {
-	if (context.dedupedDisplay.length > 0) return countFromDisplayViolations(context.dedupedDisplay);
-	if (context.dedupedJson.length > 0) return countFromJsonViolations(context.dedupedJson);
-	return {
-		errorCount: context.regex.errorCount + context.ast.errorCount,
-		warningCount: context.regex.warningCount + context.ast.warningCount,
-	};
+	const combined = combineRegexAndAstScanResults(regex, ast);
+	if (shouldPrint && !isJsonViolationList(combined.violations) && combined.violations.length > 0) {
+		printDedupedDisplay(combined.violations);
+	}
+	return combined;
 }
 export async function main(argv?: string[]): Promise<void> {
 	const effectiveArgv = argv ?? process.argv;
@@ -115,6 +81,9 @@ export async function main(argv?: string[]): Promise<void> {
 	const program = buildProgram();
 	program.parse(effectiveArgv);
 	const opts = program.opts<CliOptions>();
+	if (opts.report !== undefined && opts.report !== "json") {
+		failUsage("unsupported --report format (choices: json)");
+	}
 	const reportJson = opts.report === "json";
 	const legacyJson = Boolean(opts.json);
 	if (reportJson && legacyJson) {
@@ -277,7 +246,7 @@ function buildProgram(): Command {
 		.option("--files <path>", "file to include in a scoped run", collectPaths, [])
 		.option("--files-from <path>", "newline-separated paths, or - for stdin")
 		.option("--renames-from <path>", "from<TAB>to rename map for baseline carry")
-		.option("--report <format>", "structured report format (json)")
+		.option("--report <format>", "structured report format (choices: json)")
 		.option("--baseline <path>", "path to the violation baseline file")
 		.option("--update-baseline", "shrink stored baseline counts after a clean run")
 		.option("--seed", "create a baseline from the current violation counts (full scan)")
@@ -350,33 +319,5 @@ function outputJsonAndExit(result: CombinedScanResult): never {
 	console.log(JSON.stringify(result));
 	process.exit(result.errorCount > 0 ? 1 : 0);
 }
-function countFromDisplayViolations(violations: DisplayViolation[]): {
-	errorCount: number;
-	warningCount: number;
-} {
-	let errorCount = 0;
-	let warningCount = 0;
-	for (const v of violations) {
-		if (v.rule.severity === "error") errorCount++;
-		else warningCount++;
-	}
-	return { errorCount, warningCount };
-}
-function countFromJsonViolations(violations: JsonViolation[]): {
-	errorCount: number;
-	warningCount: number;
-} {
-	let errorCount = 0;
-	let warningCount = 0;
-	for (const v of violations) {
-		if (v.severity === "error") errorCount++;
-		else warningCount++;
-	}
-	return { errorCount, warningCount };
-}
 export type { CombinedScanResult };
-export {
-	deduplicateDisplayViolations,
-	deduplicateJsonViolations,
-	DEFAULT_SCAN_PATTERN as DEFAULT_PATTERN,
-};
+export { DEFAULT_SCAN_PATTERN as DEFAULT_PATTERN };

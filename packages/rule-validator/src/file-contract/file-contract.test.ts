@@ -28,7 +28,6 @@ import {
 	resolveSelectionMode,
 } from "./selection.ts";
 import { runAstRules, runAstRulesForFiles } from "../ast-scan.ts";
-import { main } from "../cli.ts";
 
 const dirtySource = `const a = document.getElementById("app")!;
 const b = document.getElementById("b")!;
@@ -357,33 +356,4 @@ console.log(JSON.stringify(pairs));`,
 		expect(shouldProcessFullScanFile("x.cjs")).toBe(false);
 	});
 
-	it("covers additional CLI and IO branches", async () => {
-		const dir = await mkdtemp(path.join(os.tmpdir(), "rv-fc-branches-"));
-		process.chdir(dir);
-		await writeFile("src.ts", "export const ok = 1;\n");
-		const exit = async (...args: string[]) =>
-			runMainExpectExit(["bun", "cli.ts", ...args]);
-		expect(await exit("doctor", "--report", "json")).toBe(2);
-		expect(await exit("--report", "json", "--json")).toBe(2);
-		const listPath = path.join(dir, "list.txt");
-		await writeFile(listPath, "\uFEFFsrc.ts\n");
-		expect(await exit("--report", "json", "--files-from", listPath)).toBe(2);
-		await rm(dir, { recursive: true, force: true });
-	});
 });
-
-async function runMainExpectExit(argv: string[]): Promise<number> {
-	let code = 0;
-	const spy = spyOn(process, "exit").mockImplementation((c) => {
-		code = Number(c);
-		throw new Error("exit");
-	});
-	try {
-		await main(argv);
-	} catch {
-		// process.exit stub
-	} finally {
-		spy.mockRestore();
-	}
-	return code;
-}

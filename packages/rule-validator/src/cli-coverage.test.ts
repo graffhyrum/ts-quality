@@ -82,6 +82,20 @@ describe("cli coverage", () => {
 		}
 	});
 
+	it("rejects unsupported --report format", async () => {
+		const spy = spyOn(process, "exit").mockImplementation((exitCode) => {
+			expect(exitCode).toBe(2);
+			throw new Error("exit");
+		});
+		try {
+			await main(["bun", "cli.ts", "--report", "human"]);
+		} catch (error) {
+			if (!(error instanceof Error) || error.message !== "exit") throw error;
+		} finally {
+			spy.mockRestore();
+		}
+	});
+
 	it("rejects incompatible json flags", async () => {
 		const spy = spyOn(process, "exit").mockImplementation((exitCode) => {
 			expect(exitCode).toBe(2);
