@@ -30,12 +30,11 @@ describe("mutate4ts CLI", () => {
     expect(result.stdout).toContain("Usage:");
   });
 
-  test("rejects non-.ts files with exit 2, an Error line and no stack trace", () => {
-    const result = run(["somefile.js"]);
-    expect(result.exitCode).toBe(2);
-    expect(result.stderr).toContain("Error: ");
-    expect(result.stderr).toContain("must be a .ts or .tsx file");
-    expect(result.stderr).not.toContain("    at ");
+  test("ignores a non-TypeScript path in the legacy positional", () => {
+    const result = run(["--report", "json", "somefile.js"]);
+    expect(result.exitCode).toBe(0);
+    const doc = JSON.parse(result.stdout);
+    expect(doc.files).toEqual([]);
   });
 
   test("rejects unknown flag with exit 2", () => {
@@ -210,12 +209,10 @@ describe("mutate4ts CLI", () => {
     });
   });
 
-  test("a missing source file exits 2 with an Error line and no stack trace", () => {
+  test("skips a missing source file in --scan mode", () => {
     const result = run(["--scan", "test/fixtures/does-not-exist.ts"]);
-    expect(result.exitCode).toBe(2);
-    expect(result.stderr).toMatch(/^Error: /m);
-    expect(result.stderr).toContain("does-not-exist.ts");
-    expect(result.stderr).not.toContain("    at ");
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("No mutation sites found");
   });
 
   test("rejects invalid --lines value", () => {
