@@ -22,6 +22,11 @@ export function absolutePathForKey(key: string, cwd = process.cwd()): string {
   return path.resolve(cwd, key);
 }
 
+/** Sort order for baseline keys and report paths (UTF-16 code units, not locale). */
+export function comparePath(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
 export class UsageError extends Error {
   constructor(message: string) {
     super(message);

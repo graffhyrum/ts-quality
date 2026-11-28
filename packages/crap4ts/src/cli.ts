@@ -97,18 +97,12 @@ async function buildTargeting(values: ParsedValues, positionals: string[]): Prom
     filesFlags,
     filesFromPaths,
     filesFromPresent: filesFrom !== undefined,
-    filesFromEmpty: filesFromPresentIsEmpty(filesFrom, filesFromPaths),
+    filesFromEmpty: filesFrom !== undefined && filesFromPaths.length === 0,
     legacyFiles: positionals,
     legacyPresent: positionals.length > 0,
     renamesFrom,
     renamePairs,
   };
-}
-
-function filesFromPresentIsEmpty(filesFrom: string | undefined, paths: string[]): boolean {
-  if (filesFrom === undefined) return false;
-  if (filesFrom !== "-") return paths.length === 0;
-  return paths.length === 0;
 }
 
 function assertNoContractOnInit(values: ParsedValues): void {

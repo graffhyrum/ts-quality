@@ -21,8 +21,6 @@ describe("runPipeline baseline update", () => {
     const log = console.log;
     console.log = (m?: unknown) => logs.push(String(m));
     try {
-      await mkdir(path.join(dir, "coverage"), { recursive: true });
-      await writeFile(path.join(dir, "coverage/coverage-final.json"), "{}");
       process.chdir(dir);
       const code = await runPipeline(
         pipelineConfig({

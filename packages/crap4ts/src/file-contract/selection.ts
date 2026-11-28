@@ -3,7 +3,7 @@ import { isGitignored } from "../gitignore";
 import type { FileSystem } from "../detect/types";
 import { bunFileSystem } from "../detect/fs";
 import { hasExplicitListExtension } from "./extensions";
-import { absolutePathForKey, normalizeBaselineKey } from "./path-key";
+import { absolutePathForKey, comparePath, normalizeBaselineKey } from "./path-key";
 
 export type SelectionMode = "full" | "scoped";
 
@@ -46,7 +46,7 @@ export async function buildScopedKeys(
   for (const path of legacyPaths) {
     raw.add(normalizeBaselineKey(path));
   }
-  const keys = [...raw].sort((a, b) => a.localeCompare(b));
+  const keys = [...raw].sort(comparePath);
   const out: string[] = [];
   for (const key of keys) {
     if (!hasExplicitListExtension(key)) continue;

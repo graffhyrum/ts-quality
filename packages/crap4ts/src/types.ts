@@ -1,3 +1,5 @@
+import type { RenamePair } from "./file-contract/types";
+
 export type FunctionInfo = {
   name: string;
   filePath: string;
@@ -36,8 +38,6 @@ export type CoverageFormat = "istanbul" | "lcov" | "v8";
 export type OutputFormat = "table" | "json" | "html";
 
 export type SortField = "score" | "name" | "complexity" | "coverage";
-
-import type { RenamePair } from "./file-contract/types";
 
 export type FileTargeting = {
   filesFlags: string[];

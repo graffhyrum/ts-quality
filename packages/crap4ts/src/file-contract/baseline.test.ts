@@ -84,12 +84,19 @@ describe("baseline file-contract", () => {
     expect(doc.files).toEqual({ "src/a.ts": 2 });
   });
 
-  test("serializeBaseline sorts keys for stable output", () => {
+  test("serializeBaseline sorts keys by UTF-16 code units", () => {
     const text = serializeBaseline({
       version: 1,
-      files: { "src/z.ts": 1, "src/a.ts": 2 },
+      files: { a: 1, B: 2, _x: 3, "src/z.ts": 4 },
     });
-    expect(text.indexOf("src/a.ts")).toBeLessThan(text.indexOf("src/z.ts"));
+    const bAt = text.indexOf('"B"');
+    const underscoreAt = text.indexOf('"_x"');
+    const aAt = text.indexOf('"a"');
+    expect(bAt).toBeGreaterThan(-1);
+    expect(underscoreAt).toBeGreaterThan(-1);
+    expect(aAt).toBeGreaterThan(-1);
+    expect(bAt).toBeLessThan(underscoreAt);
+    expect(underscoreAt).toBeLessThan(aAt);
   });
 
   test("applyRenamesInMemory sorts rename pairs before applying", async () => {

@@ -9,7 +9,7 @@ import {
   writeBaselineIfChanged,
 } from "./file-contract/baseline";
 import { buildQualityReport, printQualityReport } from "./file-contract/quality-report";
-import { absolutePathForKey } from "./file-contract/path-key";
+import { absolutePathForKey, comparePath } from "./file-contract/path-key";
 import {
   buildScopedKeys,
   resolveSelectionMode,
@@ -74,7 +74,7 @@ export async function runPipeline(
     const violations = violationsByFileKey(allMatched, plan.reportKeys);
     const baselineState = await loadBaselineState(config, plan);
     if (config.seed) {
-      return await runSeed(config, plan, violations, baselineState, warnings);
+      return await runSeed(config, plan, violations, warnings);
     }
     const rows = buildReportRows(plan.reportKeys, violations, baselineState.effective);
     let exitCode = resolveExitCode(config, rows, baselineState.effective, inScope);
@@ -112,7 +112,7 @@ async function buildAnalysisPlan(config: Config, fs: FileSystem): Promise<Analys
     return { mode, scopedKeys, sourcePaths, reportKeys: scopedKeys };
   }
   const sourcePaths = await resolveGlobFiles(config.include, config.exclude, gitignoreGlobs, fs);
-  const reportKeys = sourcePaths.map((p) => functionFileKey(p)).sort((a, b) => a.localeCompare(b));
+  const reportKeys = sourcePaths.map((p) => functionFileKey(p)).sort(comparePath);
   return { mode, scopedKeys: [], sourcePaths, reportKeys };
 }
 
@@ -130,10 +130,6 @@ async function finishWithNoFiles(
   violations: Map<string, number>,
   fs: FileSystem,
 ): Promise<0 | 1 | 2> {
-  if (config.updateBaseline) {
-    const onDisk = await readBaselineFile(config.baselinePath);
-    assertBaselinePresent(onDisk);
-  }
   const baselineState = await loadBaselineState(config, plan);
   const rows = buildReportRows(plan.reportKeys, violations, baselineState.effective);
   const exitCode = resolveExitCode(config, rows, baselineState.effective, []);
@@ -183,7 +179,6 @@ async function runSeed(
   config: Config,
   plan: AnalysisPlan,
   violations: Map<string, number>,
-  baselineState: BaselineState,
   warnings: string[],
 ): Promise<0 | 1 | 2> {
   if (plan.mode !== "full") {
@@ -272,7 +267,7 @@ async function resolveGlobFiles(
   const results: string[] = [];
   for await (const file of includeGlob.scan({ cwd: "." })) {
     if (!excludeGlob.match(file) && !isGitignored(gitignoreGlobs, file)) {
-      if (await fs.exists(path.resolve(file))) results.push(path.resolve(file));
+      results.push(path.resolve(file));
     }
   }
   return results;
