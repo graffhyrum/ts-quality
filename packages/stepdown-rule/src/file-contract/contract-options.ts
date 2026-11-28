@@ -10,10 +10,7 @@ export const renamesFromOption = new Option(
 	"from<TAB>to rename map for baseline carry",
 );
 
-export const reportOption = new Option(
-	"--report <format>",
-	"structured report format (json)",
-).choices(["json"]);
+export const reportOption = new Option("--report <format>", "structured report format (json)");
 
 export const baselineOption = new Option(
 	"--baseline <path>",

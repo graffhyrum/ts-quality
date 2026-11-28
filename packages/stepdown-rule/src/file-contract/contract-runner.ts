@@ -54,6 +54,9 @@ export async function runContractCommand(invocation: ContractInvocation): Promis
 		process.exitCode = ExitUsage;
 		return;
 	}
+	if (options.report !== undefined && options.report !== "json") {
+		failUsage(`unknown --report format: ${options.report}`);
+	}
 	const reportJson = options.report === "json";
 	const legacyJson = Boolean(options.json);
 	const userFormat = options.format;
