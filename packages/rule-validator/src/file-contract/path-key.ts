@@ -1,6 +1,13 @@
 import path from "node:path";
 import { asRelativePosix, type RelativePosixPath } from "../paths.ts";
 
+/** UTF-16 code-unit lexicographic order (ADR baseline/report path sorting). */
+export function comparePath(a: string, b: string): number {
+	if (a < b) return -1;
+	if (a > b) return 1;
+	return 0;
+}
+
 export function normalizeBaselineKey(raw: string, cwd = process.cwd()): RelativePosixPath {
 	const stripped = raw.replace(/\r$/, "");
 	if (stripped.includes("\n") || stripped.includes("\0")) {

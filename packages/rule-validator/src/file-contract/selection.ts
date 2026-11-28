@@ -2,6 +2,7 @@ import { promises as fs } from "node:fs";
 import { REGEX_SCAN_DEFAULT_EXCLUDES } from "../exclude-patterns.ts";
 import { hasFullScanExtension } from "./extensions.ts";
 import { shouldProcessExplicitListFile, shouldProcessFullScanFile } from "./file-filter.ts";
+import { comparePath } from "./path-key.ts";
 import { pathExists } from "./read-inputs.ts";
 export const DEFAULT_SCAN_PATTERN = "**/*.{ts,tsx,js,jsx}";
 export type SelectionMode = "full" | "scoped";
@@ -40,7 +41,7 @@ export async function buildFileSelection(
 			raw.add(file.replaceAll("\\", "/"));
 		}
 	}
-	const scopedKeys = await filterScopedKeys([...raw].sort((a, b) => a.localeCompare(b)));
+	const scopedKeys = await filterScopedKeys([...raw].sort(comparePath));
 	return {
 		mode: "scoped",
 		pattern: inputs.legacyPattern ?? DEFAULT_SCAN_PATTERN,
@@ -78,5 +79,5 @@ export async function discoverFullScanKeys(pattern: string): Promise<string[]> {
 		if (!(await pathExists(key))) continue;
 		keys.push(key);
 	}
-	return keys.sort((a, b) => a.localeCompare(b));
+	return keys.sort(comparePath);
 }

@@ -316,6 +316,12 @@ console.log(JSON.stringify(pairs));`,
 		await rm(dir, { recursive: true, force: true });
 	});
 
+	it("serializes baseline keys in UTF-16 code-unit order", () => {
+		const doc = { version: 1 as const, files: { a: 1, B: 1, "_x": 2 } };
+		const parsed = JSON.parse(serializeBaseline(doc)) as { files: Record<string, number> };
+		expect(Object.keys(parsed.files)).toEqual(["B", "_x", "a"]);
+	});
+
 	it("manages baseline documents", async () => {
 		const dir = await mkdtemp(path.join(os.tmpdir(), "rv-fc-base-"));
 		process.chdir(dir);
