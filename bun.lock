@@ -31,7 +31,7 @@
     },
     "packages/file-selector": {
       "name": "@graffhyrum/file-selector",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "bin": {
         "file-selector": "src/cli.ts",
       },
